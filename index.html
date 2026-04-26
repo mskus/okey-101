@@ -4,59 +4,143 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>101 Okey Pro</title>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        :root {
+            --bg: #f4f4f9; --card-bg: #ffffff; --primary: #4f46e5; --success: #10b981; 
+            --danger: #ef4444; --warning: #f59e0b; --text: #1f2937; --border: #e5e7eb;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding: 10px; padding-bottom: 40px; }
+        
+        .container { max-width: 600px; margin: 0 auto; }
+        .card { background: var(--card-bg); border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        h1, h2, h3 { text-align: center; margin-bottom: 15px; color: var(--primary); }
+        
+        input[type="text"], input[type="number"], select { 
+            width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; margin-bottom: 10px; background: #fafafa;
+        }
+        input:focus, select:focus { border-color: var(--primary); outline: none; }
+        
+        button { 
+            width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; color: white; transition: 0.2s;
+        }
+        .btn-primary { background: var(--primary); }
+        .btn-success { background: var(--success); }
+        .btn-danger { background: var(--danger); }
+        .btn-warning { background: var(--warning); color: #000; }
+        .btn-outline { background: transparent; border: 2px solid var(--border); color: var(--text); }
+        
+        /* SKOR TABLOSU (Sticky Top) */
+        .scoreboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; text-align: center; position: sticky; top: 0; z-index: 100; background: var(--card-bg); padding: 10px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); margin-bottom: 15px; }
+        .score-box h4 { font-size: 12px; color: #6b7280; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .score-box .total { font-size: 20px; font-weight: 900; color: var(--primary); }
+        
+        /* OYUNCU KARTLARI (Grid) */
+        .players-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .player-card { border: 1px solid var(--border); padding: 10px; border-radius: 8px; background: #f9fafb; }
+        .player-card h4 { text-align: center; margin-bottom: 10px; font-size: 14px; }
+        .checkbox-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; font-size: 14px; }
+        .checkbox-group label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+        .checkbox-group input[type="checkbox"] { width: 18px; height: 18px; }
+        
+        /* HIZLI CEZA BUTONLARI */
+        .penalty-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px; }
+        .penalty-actions button { padding: 8px; font-size: 12px; }
+        
+        /* BİTİRİŞ ALANI */
+        .finish-area { background: #eef2ff; border: 2px dashed var(--primary); }
+        
+        /* GEÇMİŞ TABLOSU */
+        .history-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: center; }
+        .history-table th, .history-table td { border: 1px solid var(--border); padding: 8px; }
+        .history-table th { background: #f3f4f6; }
+        .row-penalty { color: var(--danger); font-size: 11px; display: block; }
+        
+        @media (max-width: 400px) {
+            .players-grid { grid-template-columns: 1fr; }
+        }
+    </style>
 </head>
 <body>
-    <div class="app-container">
-        <header>
-            <h1>101 Okey Skor</h1>
-        </header>
 
-        <section id="game-setup" class="card">
-            <h2>Yeni Oyun Başlat</h2>
-            <div class="mode-selector">
-                <button id="singleModeBtn" class="mode-btn active">Tekli Oyun</button>
-                <button id="teamModeBtn" class="mode-btn">Eşli Oyun</button>
-            </div>
-            
-            <div id="player-inputs" class="input-grid">
-                <input type="text" placeholder="1. Oyuncu" id="p1">
-                <input type="text" placeholder="2. Oyuncu" id="p2">
-                <input type="text" placeholder="3. Oyuncu" id="p3">
-                <input type="text" placeholder="4. Oyuncu" id="p4">
-            </div>
-            <button id="startGame" class="btn-primary">Oyunu Başlat</button>
-        </section>
-
-        <section id="game-area" class="card" style="display:none;">
-            <div class="table-header-actions">
-                <button id="toggleTotals" class="btn-secondary">Toplamı Gizle/Göster</button>
-            </div>
-            
-            <div class="table-responsive">
-                <table id="scoreTable">
-                    <thead>
-                        <tr id="tableHeader"></tr>
-                    </thead>
-                    <tbody id="scoreBody"></tbody>
-                    <tfoot id="totalsSection">
-                        <tr id="totalScores"></tr>
-                    </tfoot>
-                </table>
-            </div>
-
-            <div class="controls">
-                <button id="addRound" class="btn-success">+ Yeni El Ekle</button>
-                <button id="finishGame" class="btn-danger">Maçı Bitir ve Kaydet</button>
-            </div>
-        </section>
-
-        <section id="history" class="card">
-            <h2>Geçmiş Maçlar</h2>
-            <div id="historyList" class="history-container">
-                </div>
-        </section>
+<div class="container" id="app">
     </div>
-    <script src="script.js"></script>
-</body>
-</html>
+
+<script>
+// --- STATE MANAGEMENT (Tüm verilerin tutulduğu obje) ---
+let state = JSON.parse(localStorage.getItem('okey101State')) || {
+    screen: 'setup', // 'setup' veya 'game'
+    players: ["Oyuncu 1", "Oyuncu 2", "Oyuncu 3", "Oyuncu 4"],
+    totals: [0, 0, 0, 0],
+    history: [], // Oynanan eller ve anlık cezalar burada tutulur
+    currentRound: {
+        p0: { opened: true, double: false, score: "" },
+        p1: { opened: true, double: false, score: "" },
+        p2: { opened: true, double: false, score: "" },
+        p3: { opened: true, double: false, score: "" },
+        winner: "-1",
+        winType: "normal" // normal, elden, joker, elden_joker
+    }
+};
+
+// --- CORE FUNCTIONS ---
+function saveState() {
+    localStorage.setItem('okey101State', JSON.stringify(state));
+    render();
+}
+
+function updateDraft(playerIndex, field, value) {
+    state.currentRound[`p${playerIndex}`][field] = value;
+    saveState();
+}
+
+// --- KURALLAR VE HESAPLAMA MOTORU ---
+function calculateRound() {
+    let winnerIdx = parseInt(state.currentRound.winner);
+    let winType = state.currentRound.winType;
+    let roundScores = [0, 0, 0, 0];
+    let winnerWentDouble = winnerIdx >= 0 ? state.currentRound[`p${winnerIdx}`].double : false;
+
+    for (let i = 0; i < 4; i++) {
+        let p = state.currentRound[`p${i}`];
+        
+        // EĞER KAZANAN BU OYUNCUYSA
+        if (i === winnerIdx) {
+            if (winType === 'normal') roundScores[i] = -101;
+            else if (winType === 'joker' || winType === 'elden') roundScores[i] = -202;
+            else if (winType === 'elden_joker') roundScores[i] = -404;
+            continue;
+        }
+
+        // KAZANAMAYAN OYUNCULAR
+        let basePenalty = 0;
+        if (!p.opened) {
+            basePenalty = 202; // El açmamışsa taban ceza 202
+        } else {
+            basePenalty = parseInt(p.score) || 0; // Açmışsa elindeki taş toplamı
+        }
+
+        // Çarpanları Hesapla
+        let multiplier = 1;
+        if (p.double) multiplier *= 2; // Kendi çifte gittiyse x2
+        if (winnerWentDouble) multiplier *= 2; // Kazanan çifte gittiyse x2
+        
+        if (winType === 'joker' || winType === 'elden') multiplier *= 2; // Jokerle veya Elden bittiyse x2
+        if (winType === 'elden_joker') multiplier *= 4; // Elden + Joker bittiyse x4
+
+        roundScores[i] = basePenalty * multiplier;
+    }
+
+    // Toplamlara Ekle ve Geçmişe Yaz
+    for (let i = 0; i < 4; i++) state.totals[i] += roundScores[i];
+    
+    state.history.push({
+        type: 'round',
+        roundNum: state.history.filter(h => h.type === 'round').length + 1,
+        scores: roundScores,
+        details: winnerIdx === -1 ? "Kimse Bitemedi" : `${state.players[winnerIdx]} Bitti (${winType})`
+    });
+
+    // Yeni ele geç (Draftı sıfırla)
+    state.currentRound = {
+        p0: { opened: true, double: false, score:
