@@ -23,3 +23,14 @@ th { background: #f8f9fa; }
 tfoot tr { font-weight: bold; background: #eee; }
 
 .history-item { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; list-style: none; }
+
+.hidden { display: none !important; }
+.info-btn { background: #3498db; color: white; margin-bottom: 10px; }
+.round-num { font-weight: bold; color: #7f8c8d; background: #f1f1f1; }
+
+/* Biter ve Çift Biter Butonları */
+.finish-btn { font-size: 11px; padding: 4px 8px; margin: 2px; }
+.btn-biter { background: #2ecc71; color: white; }
+.btn-cift { background: #9b59b6; color: white; }
+
+.quick-penalties { margin-top: 20px; padding: 15px; border: 1px dashed #ccc; border-radius: 8px; }
