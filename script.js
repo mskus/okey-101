@@ -1,200 +1,215 @@
-let isTeamMode = false;
-let players = [];
-let roundCount = 0;
-
-// Sayfa açıldığında verileri geri yükle
-window.onload = () => {
-    loadHistory();
-    checkActiveGame();
-};
-
-// Mod Değişimi
-document.getElementById('singleModeBtn').onclick = () => {
-    isTeamMode = false;
-    document.getElementById('p3').style.display = 'block';
-    document.getElementById('p4').style.display = 'block';
-    document.getElementById('p1').placeholder = "1. Oyuncu";
-    document.getElementById('p2').placeholder = "2. Oyuncu";
-    updateButtons('singleModeBtn', 'teamModeBtn');
-};
-
-document.getElementById('teamModeBtn').onclick = () => {
-    isTeamMode = true;
-    document.getElementById('p3').style.display = 'none';
-    document.getElementById('p4').style.display = 'none';
-    document.getElementById('p1').placeholder = "Takım A";
-    document.getElementById('p2').placeholder = "Takım B";
-    updateButtons('teamModeBtn', 'singleModeBtn');
-};
-
-function updateButtons(activeId, inactiveId) {
-    document.getElementById(activeId).classList.add('active');
-    document.getElementById(inactiveId).classList.remove('active');
-}
-
-// Oyunu Başlat
-document.getElementById('startGame').onclick = () => {
-    players = isTeamMode 
-        ? [document.getElementById('p1').value || 'Takım A', document.getElementById('p2').value || 'Takım B']
-        : [document.getElementById('p1').value || 'Oyn 1', document.getElementById('p2').value || 'Oyn 2', document.getElementById('p3').value || 'Oyn 3', document.getElementById('p4').value || 'Oyn 4'];
-    
-    roundCount = 0;
-    document.getElementById('scoreBody').innerHTML = ''; // Temizle
-    
-    startUI();
-    addRoundRow();
-    saveGameState();
-};
-
-function startUI() {
-    document.getElementById('game-setup').style.display = 'none';
-    document.getElementById('game-area').style.display = 'block';
-    const header = document.getElementById('tableHeader');
-    header.innerHTML = '<th class="round-num">El</th>' + players.map(p => `<th>${p}</th>`).join('');
-}
-
-// Toplam Gizle/Göster
-document.getElementById('toggleTotals').onclick = () => {
-    document.getElementById('totalsSection').classList.toggle('hidden');
-};
-
-// Yeni El Ekle
-document.getElementById('addRound').onclick = () => {
-    addRoundRow();
-    saveGameState();
-};
-
-function addRoundRow(existingScores = null) {
-    roundCount++;
-    const tbody = document.getElementById('scoreBody');
-    const tr = document.createElement('tr');
-    
-    let cells = `<td class="round-num">${roundCount}</td>`;
-    
-    players.forEach((_, idx) => {
-        let val = existingScores ? existingScores[idx] : 0;
-        cells += `
-            <td>
-                <input type="number" class="score-input p-${idx}" value="${val}" oninput="updateTotals()">
-                <div class="action-btns">
-                    <button class="btn-success" onclick="setScore(${idx}, -101)">Biter</button>
-                    <button class="btn-primary" onclick="setScore(${idx}, -202)">Çift</button>
-                </div>
-            </td>`;
-    });
-    
-    tr.innerHTML = cells;
-    tbody.appendChild(tr);
-    updateTotals();
-}
-
-// Hızlı Bitiş Skoru
-window.setScore = (playerIdx, value) => {
-    const rows = document.querySelectorAll('#scoreBody tr');
-    const lastRow = rows[rows.length - 1];
-    const input = lastRow.querySelector(`.p-${playerIdx}`);
-    input.value = value;
-    updateTotals(); 
-};
-
-// Toplamları Hesapla ve OTOMATİK KAYDET
-window.updateTotals = () => {
-    const allRows = document.querySelectorAll('#scoreBody tr');
-    let totals = new Array(players.length).fill(0);
-    
-    allRows.forEach(row => {
-        players.forEach((_, idx) => {
-            const val = parseInt(row.querySelector(`.p-${idx}`).value) || 0;
-            totals[idx] += val;
-        });
-    });
-
-    const footer = document.getElementById('totalScores');
-    footer.innerHTML = '<td class="round-num">TOP</td>' + totals.map(t => `<td>${t}</td>`).join('');
-    
-    saveGameState();
-};
-
-// AKTİF OYUNU KAYDETME MANTIĞI (Veri Kaybını Önler)
-function saveGameState() {
-    if (players.length === 0) return; 
-
-    const allRows = document.querySelectorAll('#scoreBody tr');
-    let roundsData = [];
-    
-    allRows.forEach(row => {
-        let rowScores = [];
-        players.forEach((_, idx) => {
-            rowScores.push(parseInt(row.querySelector(`.p-${idx}`).value) || 0);
-        });
-        roundsData.push(rowScores);
-    });
-
-    localStorage.setItem('activeOkeyGame', JSON.stringify({
-        players: players,
-        isTeamMode: isTeamMode,
-        rounds: roundsData
-    }));
-}
-
-// YARIM KALAN OYUNU YÜKLE
-function checkActiveGame() {
-    const savedGame = localStorage.getItem('activeOkeyGame');
-    if (savedGame) {
-        const game = JSON.parse(savedGame);
-        players = game.players;
-        isTeamMode = game.isTeamMode;
-        roundCount = 0; // addRoundRow içinde artacak
-        
-        startUI();
-        game.rounds.forEach(roundScores => {
-            addRoundRow(roundScores);
-        });
+// --- STATE MANAGEMENT (Tüm verilerin tutulduğu obje) ---
+let state = JSON.parse(localStorage.getItem('okey101State')) || {
+    screen: 'setup', // 'setup' veya 'game'
+    players: ["Oyuncu 1", "Oyuncu 2", "Oyuncu 3", "Oyuncu 4"],
+    totals: [0, 0, 0, 0],
+    history: [], // Oynanan eller ve anlık cezalar burada tutulur
+    currentRound: {
+        p0: { opened: true, double: false, score: "" },
+        p1: { opened: true, double: false, score: "" },
+        p2: { opened: true, double: false, score: "" },
+        p3: { opened: true, double: false, score: "" },
+        winner: "-1",
+        winType: "normal" // normal, elden, joker, elden_joker
     }
-}
-
-// MAÇI BİTİR VE GEÇMİŞE EKLE
-document.getElementById('finishGame').onclick = () => {
-    if(!confirm("Maçı bitirmek ve kaydetmek istediğine emin misin?")) return;
-
-    const totals = Array.from(document.getElementById('totalScores').cells).slice(1).map(c => c.innerText);
-    const resultText = players.map((p, i) => `${p}: ${totals[i]} Puan`).join(' | ');
-
-    const log = {
-        date: new Date().toLocaleString('tr-TR'),
-        mode: isTeamMode ? 'Eşli Oyun' : 'Tekli Oyun',
-        result: resultText,
-        totalRounds: roundCount
-    };
-    
-    let history = JSON.parse(localStorage.getItem('okeyHistory') || '[]');
-    history.push(log);
-    localStorage.setItem('okeyHistory', JSON.stringify(history));
-    
-    localStorage.removeItem('activeOkeyGame'); 
-    alert('Oyun Başarıyla Kaydedildi!');
-    location.reload();
 };
 
-// GEÇMİŞ MAÇLARI LİSTELE
-function loadHistory() {
-    const list = document.getElementById('historyList');
-    list.innerHTML = '';
-    let history = JSON.parse(localStorage.getItem('okeyHistory') || '[]');
+// --- CORE FUNCTIONS (Temel Fonksiyonlar) ---
+function saveState() {
+    localStorage.setItem('okey101State', JSON.stringify(state));
+    render(); // Veri her değiştiğinde ekranı günceller
+}
+
+function updateDraft(playerIndex, field, value) {
+    state.currentRound[`p${playerIndex}`][field] = value;
+    saveState();
+}
+
+// --- KURALLAR VE HESAPLAMA MOTORU ---
+window.calculateRound = function() {
+    let winnerIdx = parseInt(state.currentRound.winner);
+    let winType = state.currentRound.winType;
+    let roundScores = [0, 0, 0, 0];
+    let winnerWentDouble = winnerIdx >= 0 ? state.currentRound[`p${winnerIdx}`].double : false;
+
+    for (let i = 0; i < 4; i++) {
+        let p = state.currentRound[`p${i}`];
+        
+        // EĞER KAZANAN BU OYUNCUYSA
+        if (i === winnerIdx) {
+            if (winType === 'normal') roundScores[i] = -101;
+            else if (winType === 'joker' || winType === 'elden') roundScores[i] = -202;
+            else if (winType === 'elden_joker') roundScores[i] = -404;
+            continue;
+        }
+
+        // KAZANAMAYAN OYUNCULAR
+        let basePenalty = 0;
+        if (!p.opened) {
+            basePenalty = 202; // El açmamışsa taban ceza 202
+        } else {
+            basePenalty = parseInt(p.score) || 0; // Açmışsa elindeki taş toplamı
+        }
+
+        // Çarpanları Hesapla
+        let multiplier = 1;
+        if (p.double) multiplier *= 2; // Kendi çifte gittiyse x2
+        if (winnerWentDouble) multiplier *= 2; // Kazanan çifte gittiyse x2
+        
+        if (winType === 'joker' || winType === 'elden') multiplier *= 2; // Jokerle veya Elden bittiyse x2
+        if (winType === 'elden_joker') multiplier *= 4; // Elden + Joker bittiyse x4
+
+        roundScores[i] = basePenalty * multiplier;
+    }
+
+    // Toplamlara Ekle ve Geçmişe Yaz
+    for (let i = 0; i < 4; i++) state.totals[i] += roundScores[i];
     
-    if(history.length === 0) {
-        list.innerHTML = '<p style="color:#64748b; text-align:center;">Henüz kaydedilmiş bir maç yok.</p>';
+    state.history.push({
+        type: 'round',
+        roundNum: state.history.filter(h => h.type === 'round').length + 1,
+        scores: roundScores,
+        details: winnerIdx === -1 ? "Kimse Bitemedi" : `${state.players[winnerIdx]} Bitti (${winType})`
+    });
+
+    // Yeni ele geç (Masayı sıfırla)
+    state.currentRound = {
+        p0: { opened: true, double: false, score: "" }, p1: { opened: true, double: false, score: "" },
+        p2: { opened: true, double: false, score: "" }, p3: { opened: true, double: false, score: "" },
+        winner: "-1", winType: "normal"
+    };
+    saveState();
+}
+
+window.addPenalty = function(playerIndex, amount, reason) {
+    state.totals[playerIndex] += amount;
+    state.history.push({
+        type: 'penalty',
+        playerIdx: playerIndex,
+        amount: amount,
+        reason: reason
+    });
+    saveState();
+}
+
+// --- ARAYÜZ (UI) OLUŞTURUCU ---
+window.render = function() {
+    const app = document.getElementById('app');
+    
+    // 1. KURULUM EKRANI
+    if (state.screen === 'setup') {
+        app.innerHTML = `
+            <div class="card">
+                <h1>101 Okey Kurulumu</h1>
+                <input type="text" id="p1" value="${state.players[0]}" onchange="state.players[0]=this.value; saveState();">
+                <input type="text" id="p2" value="${state.players[1]}" onchange="state.players[1]=this.value; saveState();">
+                <input type="text" id="p3" value="${state.players[2]}" onchange="state.players[2]=this.value; saveState();">
+                <input type="text" id="p4" value="${state.players[3]}" onchange="state.players[3]=this.value; saveState();">
+                <button class="btn-primary" onclick="state.screen='game'; saveState();">Oyuna Başla</button>
+            </div>
+        `;
         return;
     }
 
-    history.reverse().forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'history-item';
-        div.innerHTML = `
-            <span class="history-date">${item.date}</span>
-            <div><strong>Mod:</strong> ${item.mode} (${item.totalRounds} El Oynandı)</div>
-            <div class="history-result">${item.result}</div>
-        `;
-        list.appendChild(div);
-    });
+    // 2. OYUN EKRANI
+    let gameHTML = `
+        <div class="scoreboard">
+            ${state.players.map((p, i) => `
+                <div class="score-box">
+                    <h4>${p}</h4>
+                    <div class="total ${state.totals[i] < 0 ? 'row-penalty' : ''}" style="color:${state.totals[i] < 0 ? '#10b981' : 'var(--primary)'}">
+                        ${state.totals[i]}
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+
+        <div class="card">
+            <h2>El Hesaplayıcı (Masadaki Durum)</h2>
+            <div class="players-grid">
+                ${[0,1,2,3].map(i => {
+                    let pData = state.currentRound[`p${i}`];
+                    return `
+                    <div class="player-card">
+                        <h4>${state.players[i]}</h4>
+                        <div class="checkbox-group">
+                            <label>
+                                <input type="checkbox" ${pData.opened ? 'checked' : ''} 
+                                onchange="updateDraft(${i}, 'opened', this.checked)"> 
+                                Elini Açtı
+                            </label>
+                            <label>
+                                <input type="checkbox" ${pData.double ? 'checked' : ''} 
+                                onchange="updateDraft(${i}, 'double', this.checked)"> 
+                                Çifte Gitti
+                            </label>
+                        </div>
+                        <input type="number" placeholder="Kalan Sayı" value="${pData.score}" 
+                            ${!pData.opened ? 'disabled' : ''} 
+                            oninput="updateDraft(${i}, 'score', this.value)">
+                        
+                        <div class="penalty-actions">
+                            <button class="btn-danger" onclick="addPenalty(${i}, 101, 'Ceza (Yanlış/İşler vb.)')">+101 Ceza</button>
+                            <button class="btn-warning" onclick="addPenalty(${i}, -101, 'Ceza Sil/Düzelt')">-101 Sil</button>
+                        </div>
+                    </div>
+                    `
+                }).join('')}
+            </div>
+        </div>
+
+        <div class="card finish-area">
+            <h2>Eli Bitir</h2>
+            <select onchange="state.currentRound.winner = this.value; saveState();">
+                <option value="-1" ${state.currentRound.winner == "-1" ? 'selected' : ''}>Masada Kimse Bitemedi (Taş Bitti)</option>
+                ${state.players.map((p, i) => `
+                    <option value="${i}" ${state.currentRound.winner == i ? 'selected' : ''}>${p} BİTİRDİ</option>
+                `).join('')}
+            </select>
+            
+            <select onchange="state.currentRound.winType = this.value; saveState();" ${state.currentRound.winner == "-1" ? 'disabled' : ''}>
+                <option value="normal" ${state.currentRound.winType == "normal" ? 'selected' : ''}>Normal Bitti</option>
+                <option value="joker" ${state.currentRound.winType == "joker" ? 'selected' : ''}>Joker Atarak Bitti (x2)</option>
+                <option value="elden" ${state.currentRound.winType == "elden" ? 'selected' : ''}>Tek Elde Açtı / Elden Bitti (x2)</option>
+                <option value="elden_joker" ${state.currentRound.winType == "elden_joker" ? 'selected' : ''}>Elden + Joker Bitti (x4)</option>
+            </select>
+
+            <button class="btn-success" onclick="calculateRound()">Eli Hesapla ve Tabloya Ekle</button>
+        </div>
+
+        <div class="card">
+            <h2>Oyun Geçmişi</h2>
+            <div style="overflow-x: auto;">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Detay</th>
+                            ${state.players.map(p => `<th>${p.substring(0,5)}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${state.history.slice().reverse().map(h => {
+                            if (h.type === 'round') {
+                                return `<tr>
+                                    <td><strong>El ${h.roundNum}</strong><br><span style="font-size:10px">${h.details}</span></td>
+                                    ${h.scores.map(s => `<td>${s}</td>`).join('')}
+                                </tr>`;
+                            } else {
+                                return `<tr style="background:#fee2e2">
+                                    <td colspan="5" style="text-align:left; padding-left:10px;">
+                                        <strong style="color:var(--danger)">Hızlı Ceza:</strong> ${state.players[h.playerIdx]} -> ${h.amount > 0 ? '+'+h.amount : h.amount} (${h.reason})
+                                    </td>
+                                </tr>`;
+                            }
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+            <button class="btn-danger" style="margin-top:15px;" onclick="if(confirm('Tüm oyun silinecek, emin misin?')){ localStorage.removeItem('okey101State'); location.reload(); }">Oyunu Sıfırla (Yeni Maç)</button>
+        </div>
+    `;
+    app.innerHTML = gameHTML;
 }
+
+// Uygulamayı Başlat
+render();
