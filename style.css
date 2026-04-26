@@ -1,7 +1,9 @@
 :root {
     --bg: #f4f4f9; --card-bg: #ffffff; --primary: #4f46e5; 
     --success: #10b981; --danger: #ef4444; --warning: #f59e0b; 
-    --text: #1f2937; --border: #e5e7eb; --team-a: #3b82f6; --team-b: #ec4899;
+    --text: #1f2937; --border: #e5e7eb;
+    --team-a: #3b82f6; /* Mavi - Takım A */
+    --team-b: #f43f5e; /* Kırmızı - Takım B */
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
@@ -13,7 +15,6 @@ h1, h2, h3 { text-align: center; margin-bottom: 15px; color: var(--primary); fon
 input[type="text"], input[type="number"], select { 
     width: 100%; padding: 14px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; margin-bottom: 10px; background: #fafafa;
 }
-input:focus, select:focus { border-color: var(--primary); outline: none; }
 
 button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; }
 .btn-primary { background: var(--primary); }
@@ -21,40 +22,37 @@ button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size
 .btn-danger { background: var(--danger); }
 .btn-warning { background: var(--warning); color: #000; }
 .btn-outline { background: transparent; border: 2px solid var(--border); color: var(--text); }
-.btn-small { padding: 8px; font-size: 13px; }
+.btn-small { padding: 8px; font-size: 12px; height: auto; }
 
-/* Kurulum Ekranı Mod Seçici */
-.mode-selector { display: flex; gap: 10px; margin-bottom: 15px; }
+/* TAKIM RENKLERİ */
+.bg-team-a { background-color: var(--team-a) !important; color: white !important; }
+.bg-team-b { background-color: var(--team-b) !important; color: white !important; }
+.border-team-a { border-left: 5px solid var(--team-a) !important; }
+.border-team-b { border-left: 5px solid var(--team-b) !important; }
 
 /* SKORBOARD */
-.scoreboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.scoreboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; text-align: center; position: sticky; top: 0; z-index: 100; background: var(--card-bg); padding: 15px 10px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); margin-bottom: 15px; }
+.scoreboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; text-align: center; position: sticky; top: 0; z-index: 100; background: var(--card-bg); padding: 12px 8px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); margin-bottom: 15px; }
 .scoreboard.team-mode { grid-template-columns: 1fr 1fr; }
-.score-box h4 { font-size: 13px; color: #6b7280; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.score-box .total { font-size: 22px; font-weight: 900; color: var(--primary); }
+.score-box h4 { font-size: 11px; margin-bottom: 3px; }
+.score-box .total { font-size: 22px; font-weight: 900; }
 .hidden-score { font-size: 22px; font-weight: bold; color: #9ca3af; letter-spacing: 2px; }
 
-/* OYUNCU KARTLARI (Grid) */
+/* OYUNCU KARTLARI */
 .players-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.player-card { border: 1px solid var(--border); padding: 12px; border-radius: 8px; background: #f9fafb; }
-.player-card h4 { text-align: center; margin-bottom: 12px; font-size: 15px; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+.player-card { border: 1px solid var(--border); padding: 12px; border-radius: 8px; background: #f9fafb; position: relative; }
 
-/* BÜYÜTÜLMÜŞ KULLANIŞLI CHECKBOX'LAR */
 .checkbox-group { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
-.checkbox-group label { display: flex; align-items: center; cursor: pointer; font-size: 16px; font-weight: 500; padding: 4px 0; }
-.checkbox-group input[type="checkbox"] { width: 26px; height: 26px; margin-right: 10px; accent-color: var(--primary); cursor: pointer; }
+.checkbox-group label { display: flex; align-items: center; cursor: pointer; font-size: 15px; font-weight: 500; }
+.checkbox-group input[type="checkbox"] { width: 24px; height: 24px; margin-right: 8px; accent-color: var(--primary); }
 
-/* HIZLI CEZA BUTONLARI */
-.penalty-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
-
-/* GEÇMİŞ TABLOSU */
-.history-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: center; }
-.history-table th, .history-table td { border: 1px solid var(--border); padding: 8px; }
+/* TABLOLAR */
+.history-table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; }
+.history-table th, .history-table td { border: 1px solid var(--border); padding: 6px; }
 .history-table th { background: #f3f4f6; }
 
-/* ARŞİV KARTLARI */
-.archive-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 10px; background: #f8fafc; }
-.archive-date { font-weight: bold; color: var(--primary); font-size: 14px; margin-bottom: 8px; display: block; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;}
-.archive-result { font-size: 13px; line-height: 1.5; }
+/* ARŞİV DETAYLARI */
+.archive-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 10px; background: #f8fafc; cursor: pointer; }
+.archive-details { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #cbd5e1; }
+.archive-card.active .archive-details { display: block; }
 
 @media (max-width: 450px) { .players-grid { grid-template-columns: 1fr; } }
