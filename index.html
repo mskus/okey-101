@@ -2,64 +2,61 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>101 Skor Takip - Şafak Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>101 Okey Pro</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
+    <div class="app-container">
         <header>
-            <h1>101 Okey Skor Takip</h1>
-            <div class="mode-selector">
-                <button id="singleModeBtn" class="active">Tekli</button>
-                <button id="teamModeBtn">Eşli</button>
-            </div>
+            <h1>101 Okey Skor</h1>
         </header>
 
-        <section id="game-setup">
-            <div id="player-inputs">
-                <input type="text" placeholder="1. Oyuncu/Takım" id="p1">
-                <input type="text" placeholder="2. Oyuncu/Takım" id="p2">
+        <section id="game-setup" class="card">
+            <h2>Yeni Oyun Başlat</h2>
+            <div class="mode-selector">
+                <button id="singleModeBtn" class="mode-btn active">Tekli Oyun</button>
+                <button id="teamModeBtn" class="mode-btn">Eşli Oyun</button>
+            </div>
+            
+            <div id="player-inputs" class="input-grid">
+                <input type="text" placeholder="1. Oyuncu" id="p1">
+                <input type="text" placeholder="2. Oyuncu" id="p2">
                 <input type="text" placeholder="3. Oyuncu" id="p3">
                 <input type="text" placeholder="4. Oyuncu" id="p4">
             </div>
-            <button id="startGame">Oyunu Başlat</button>
+            <button id="startGame" class="btn-primary">Oyunu Başlat</button>
         </section>
 
-<section id="game-area" style="display:none;">
-    <div class="table-controls">
-        <button id="toggleTotals" class="info-btn">Toplam Skoru Gizle/Göster</button>
-    </div>
-    
-    <table id="scoreTable">
-        <thead>
-            <tr id="tableHeader">
-                <th>El No</th> </tr>
-        </thead>
-        <tbody id="scoreBody"></tbody>
-        <tfoot id="totalsSection">
-            <tr id="totalScores"></tr>
-        </tfoot>
-    </table>
-    
-    <div class="quick-penalties">
-        <h3>Hızlı Ceza/Bitiş Ekle</h3>
-        <div id="penaltyButtons"></div>
-    </div>
+        <section id="game-area" class="card" style="display:none;">
+            <div class="table-header-actions">
+                <button id="toggleTotals" class="btn-secondary">Toplamı Gizle/Göster</button>
+            </div>
+            
+            <div class="table-responsive">
+                <table id="scoreTable">
+                    <thead>
+                        <tr id="tableHeader"></tr>
+                    </thead>
+                    <tbody id="scoreBody"></tbody>
+                    <tfoot id="totalsSection">
+                        <tr id="totalScores"></tr>
+                    </tfoot>
+                </table>
+            </div>
 
-    <div class="controls">
-        <button id="addRound">Yeni El Ekle</button>
-        <button id="finishGame" class="danger">Maçı Bitir ve Kaydet</button>
-    </div>
-</section>
+            <div class="controls">
+                <button id="addRound" class="btn-success">+ Yeni El Ekle</button>
+                <button id="finishGame" class="btn-danger">Maçı Bitir ve Kaydet</button>
+            </div>
+        </section>
 
-
-
-
-
-        
+        <section id="history" class="card">
+            <h2>Geçmiş Maçlar</h2>
+            <div id="historyList" class="history-container">
+                </div>
+        </section>
     </div>
     <script src="script.js"></script>
 </body>
 </html>
-
