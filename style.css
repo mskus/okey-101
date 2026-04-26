@@ -1,0 +1,25 @@
+:root {
+    --bg-color: #f4f7f6;
+    --primary-color: #2c3e50;
+    --accent-color: #27ae60;
+    --danger-color: #e74c3c;
+}
+
+body { font-family: 'Segoe UI', sans-serif; background: var(--bg-color); color: var(--primary-color); margin: 0; padding: 20px; }
+.container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+
+h1 { text-align: center; font-size: 24px; }
+.mode-selector { display: flex; gap: 10px; margin-bottom: 20px; justify-content: center; }
+button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; background: #ddd; transition: 0.3s; }
+button.active, #startGame, #addRound { background: var(--accent-color); color: white; }
+.danger { background: var(--danger-color) !important; color: white; }
+
+#player-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+input { padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+th, td { border: 1px solid #eee; padding: 12px; text-align: center; }
+th { background: #f8f9fa; }
+tfoot tr { font-weight: bold; background: #eee; }
+
+.history-item { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; list-style: none; }
