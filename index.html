@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>101 Skor Takip - Şafak Pro</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>101 Okey Skor Takip</h1>
+            <div class="mode-selector">
+                <button id="singleModeBtn" class="active">Tekli</button>
+                <button id="teamModeBtn">Eşli</button>
+            </div>
+        </header>
+
+        <section id="game-setup">
+            <div id="player-inputs">
+                <input type="text" placeholder="1. Oyuncu/Takım" id="p1">
+                <input type="text" placeholder="2. Oyuncu/Takım" id="p2">
+                <input type="text" placeholder="3. Oyuncu" id="p3">
+                <input type="text" placeholder="4. Oyuncu" id="p4">
+            </div>
+            <button id="startGame">Oyunu Başlat</button>
+        </section>
+
+        <section id="game-area" style="display:none;">
+            <table id="scoreTable">
+                <thead>
+                    <tr id="tableHeader"></tr>
+                </thead>
+                <tbody id="scoreBody"></tbody>
+                <tfoot>
+                    <tr id="totalScores"></tr>
+                </tfoot>
+            </table>
+            <div class="controls">
+                <button id="addRound">Yeni El Ekle</button>
+                <button id="finishGame" class="danger">Oyunu Bitir ve Kaydet</button>
+            </div>
+        </section>
+
+        <section id="history">
+            <h2>Geçmiş Oyunlar</h2>
+            <ul id="historyList"></ul>
+        </section>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
