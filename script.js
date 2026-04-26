@@ -94,3 +94,67 @@ window.onload = () => {
         list.appendChild(li);
     });
 };
+
+
+
+let roundCount = 0;
+
+// Toplam Skor Gizle/Göster
+document.getElementById('toggleTotals').onclick = () => {
+    document.getElementById('totalsSection').classList.toggle('hidden');
+};
+
+function initTable() {
+    const header = document.getElementById('tableHeader');
+    // El No sütununu koru, üzerine oyuncuları ekle
+    header.innerHTML = '<th>El</th>' + players.map(p => `<th>${p}</th>`).join('');
+    addRoundRow();
+}
+
+function addRoundRow() {
+    roundCount++;
+    const tbody = document.getElementById('scoreBody');
+    const tr = document.createElement('tr');
+    
+    let cells = `<td class="round-num">${roundCount}</td>`; // El numarası
+    
+    players.forEach((_, idx) => {
+        cells += `
+            <td>
+                <input type="number" class="score-input p-${idx}" value="0">
+                <div class="action-btns">
+                    <button class="finish-btn btn-biter" onclick="setScore(${idx}, -101)">Biter</button>
+                    <button class="finish-btn btn-cift" onclick="setScore(${idx}, -202)">Çift</button>
+                </div>
+            </td>`;
+    });
+    
+    tr.innerHTML = cells;
+    tbody.appendChild(tr);
+    updateTotals();
+}
+
+// Belirli bir oyuncuya hızlı skor/ceza atama
+window.setScore = (playerIdx, value) => {
+    // Son eklenen satırdaki ilgili oyuncunun inputunu bul
+    const rows = document.querySelectorAll('#scoreBody tr');
+    const lastRow = rows[rows.length - 1];
+    const input = lastRow.querySelector(`.p-${playerIdx}`);
+    input.value = value;
+    updateTotals(); // Toplamları tetikle
+};
+
+function updateTotals() {
+    const allRows = document.querySelectorAll('#scoreBody tr');
+    let totals = new Array(players.length).fill(0);
+    
+    allRows.forEach(row => {
+        players.forEach((_, idx) => {
+            const val = parseInt(row.querySelector(`.p-${idx}`).value) || 0;
+            totals[idx] += val;
+        });
+    });
+
+    const footer = document.getElementById('totalScores');
+    footer.innerHTML = '<td>TOPLAM</td>' + totals.map(t => `<td>${t}</td>`).join('');
+}
