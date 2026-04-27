@@ -22,59 +22,82 @@ button { padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-
 .btn-outline { background: transparent; border: 2px solid var(--border); color: var(--text); }
 .btn-small { padding: 8px; font-size: 13px; }
 
-/* TAKIM RENKLERİ */
+/* Biten Yok Butonu */
+.btn-nobody { background: #64748b; color: white; border: 1px solid #475569; }
+.btn-nobody.active { background: var(--danger); border-color: var(--danger); }
+
+/* TAKIM RENKLERİ VE YARDIMCI SINIFLAR */
 .bg-team-a { background-color: var(--team-a) !important; color: #1e3a8a !important; }
 .bg-team-b { background-color: var(--team-b) !important; color: #7f1d1d !important; }
 .border-team-a { border-top: 5px solid var(--team-a) !important; }
 .border-team-b { border-top: 5px solid var(--team-b) !important; }
+
+.text-team-a { color: #1e3a8a !important; font-weight: bold; }
+.text-team-b { color: #7f1d1d !important; font-weight: bold; }
+.bg-team-a-light { background-color: #eff6ff !important; border-color: #bfdbfe !important; }
+.bg-team-b-light { background-color: #fef2f2 !important; border-color: #fecaca !important; }
+.history-team-a { background-color: rgba(147, 197, 253, 0.2); }
+.history-team-b { background-color: rgba(252, 165, 165, 0.2); }
 
 /* OYUNCU KARTLARI */
 .players-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .player-card { border: 1px solid var(--border); padding: 15px; border-radius: 8px; background: #f8fafc; }
 .player-card h4 { text-align: center; margin-bottom: 12px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 
-/* AÇTI ve ÇİFT (Sade Butonlar) */
+/* AÇTI ve ÇİFT */
 .toggle-row { display: flex; gap: 10px; margin-bottom: 15px; }
 .btn-toggle { background: #f1f5f9; color: #64748b; border: 1px solid var(--border); font-size: 13px; padding: 8px; }
 .btn-toggle.active { background: var(--primary); color: white; border-color: var(--primary); }
 
 .penalty-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 8px; }
 
-/* BİTİRİŞ VE MOD SEÇİM BUTONLARI */
+/* BİTİRİŞ KONTROLLERİ */
 .fast-select-group { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; justify-content: center; }
 .btn-select { flex: 1; min-width: 45%; background: #f1f5f9; color: #475569; border: 1px solid var(--border); padding: 12px; font-size: 14px; border-radius: 8px; }
 .btn-select.active { background: var(--primary); color: white; border-color: var(--primary); }
+.btn-winner.active.text-team-a { background: #1e3a8a; color: white; border-color: #1e3a8a; }
+.btn-winner.active.text-team-b { background: #7f1d1d; color: white; border-color: #7f1d1d; }
 
 .winner-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
 .winner-col { display: flex; flex-direction: column; gap: 10px; }
 .win-type-bottom { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px;}
 
-/* GİZLİ SKOR TABLOSU (ÇEKMECE) */
+/* TABLOLAR */
+.history-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: center; }
+.history-table th, .history-table td { border: 1px solid var(--border); padding: 6px; }
+.history-table th { background: #f1f5f9; }
+.history-detail { font-size: 11px; display: block; margin-top: 3px; }
+
+/* ÇEKMECE SİSTEMİ (SKOR & HESAP MAKİNESİ) */
 .bottom-drawer {
-    position: fixed; bottom: 0; left: 0; right: 0; 
-    margin: 0 auto; max-width: 600px; background: var(--card-bg);
-    border-top: 3px solid var(--primary); border-radius: 20px 20px 0 0;
-    box-shadow: 0 -5px 20px rgba(0,0,0,0.15); 
-    transform: translateY(100%); transition: transform 0.3s ease-in-out; z-index: 1000;
+    position: fixed; bottom: 0; left: 0; right: 0; margin: 0 auto; max-width: 600px; 
+    background: var(--card-bg); border-top: 3px solid var(--primary); border-radius: 20px 20px 0 0;
+    box-shadow: 0 -5px 20px rgba(0,0,0,0.15); transform: translateY(100%); transition: transform 0.3s ease-in-out; z-index: 1000;
 }
 .bottom-drawer.open { transform: translateY(0); }
 
 .drawer-toggle {
-    position: absolute; top: -45px; left: 50%; transform: translateX(-50%);
-    background: var(--primary); color: white; border: none; border-radius: 12px 12px 0 0;
-    padding: 12px 25px; font-size: 15px; font-weight: bold; width: auto; cursor: pointer;
+    position: absolute; top: -45px; border: none; border-radius: 12px 12px 0 0;
+    padding: 12px 20px; font-size: 14px; font-weight: bold; width: auto; cursor: pointer; box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
 }
+.toggle-calc { left: 10px; background: #8b5cf6; color: white; }
+.toggle-score { right: 10px; background: var(--primary); color: white; }
 
+/* SKOR DETAYLARI */
 .scoreboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; padding: 20px 15px; }
 .scoreboard.team-mode { grid-template-columns: 1fr 1fr; }
 .score-box { background: var(--bg); padding: 15px 5px; border-radius: 12px; border: 1px solid var(--border); }
-.score-box h4 { font-size: 12px; margin-bottom: 5px; color: #64748b; }
-.score-box .total { font-size: 24px; font-weight: 900; }
+.score-box h4 { font-size: 14px; margin-bottom: 5px; font-weight: bold; }
+.score-box .total { font-size: 28px; font-weight: 900; margin-bottom: 5px;}
+.stat-detail { font-size: 12px; opacity: 0.85; line-height: 1.6; }
 
-/* TABLOLAR */
-.history-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: center; }
-.history-table th, .history-table td { border: 1px solid var(--border); padding: 8px; }
-.history-table th { background: #f1f5f9; }
-.history-detail { font-size: 10px; color: #64748b; display: block; margin-top: 3px; }
+/* HESAP MAKİNESİ */
+.calc-container { padding: 20px; }
+.calc-display { width: 100%; height: 50px; text-align: right; font-size: 24px; font-weight: bold; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; margin-bottom: 10px; color: #334155;}
+.calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.calc-btn { background: #e2e8f0; color: #334155; font-size: 18px; padding: 15px; }
+.calc-btn-op { background: #cbd5e1; color: var(--primary); }
+.calc-btn-eq { background: var(--success); color: white; grid-column: span 2; }
+.calc-btn-c { background: var(--danger); color: white; }
 
 @media (max-width: 450px) { .players-grid { grid-template-columns: 1fr; } }
