@@ -204,7 +204,6 @@ window.render = function() {
 
     app.innerHTML = `
         <div class="card">
-            <h2 style="margin-bottom:15px;">El Girişi</h2>
             <div class="players-grid">
                 ${[0,1,2,3].map(i => `
                     <div class="player-card ${state.mode==='team'?(i<2?'border-team-a':'border-team-b'):''}">
