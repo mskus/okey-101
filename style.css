@@ -25,30 +25,34 @@ button { padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-
 .btn-nobody { background: #64748b; color: white; border: 1px solid #475569; }
 .btn-nobody.active { background: var(--danger); border-color: var(--danger); }
 
-/* TAKIM RENKLERİ VE YARDIMCI SINIFLAR */
 .bg-team-a { background-color: var(--team-a) !important; color: #1e3a8a !important; }
 .bg-team-b { background-color: var(--team-b) !important; color: #7f1d1d !important; }
 .border-team-a { border-top: 5px solid var(--team-a) !important; }
 .border-team-b { border-top: 5px solid var(--team-b) !important; }
-
 .text-team-a { color: #1e3a8a !important; font-weight: bold; }
 .text-team-b { color: #7f1d1d !important; font-weight: bold; }
 
-/* ARŞİV KAZANAN RENKLERİ */
 .bg-team-a-light { background-color: #eff6ff !important; border-color: #93c5fd !important; border-width: 2px; }
 .bg-team-b-light { background-color: #fef2f2 !important; border-color: #fca5a5 !important; border-width: 2px; }
 .history-team-a { background-color: rgba(147, 197, 253, 0.2); }
 .history-team-b { background-color: rgba(252, 165, 165, 0.2); }
 
 .players-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.player-card { border: 1px solid var(--border); padding: 15px; border-radius: 8px; background: #f8fafc; }
-.player-card h4 { text-align: center; margin-bottom: 12px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.player-card { border: 1px solid var(--border); padding: 12px; border-radius: 8px; background: #f8fafc; }
+.player-card h4 { text-align: center; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 
-.toggle-row { display: flex; gap: 10px; margin-bottom: 15px; }
-.btn-toggle { background: #f1f5f9; color: #64748b; border: 1px solid var(--border); font-size: 13px; padding: 8px; }
+.btn-toggle { background: #f1f5f9; color: #64748b; border: 1px solid var(--border); font-size: 13px; padding: 10px; margin-bottom: 10px; }
 .btn-toggle.active { background: var(--primary); color: white; border-color: var(--primary); }
 
-.penalty-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 8px; }
+.select-penalty { 
+    width: 100%; padding: 10px 15px; border: 2px solid #fecaca; border-radius: 8px; 
+    font-size: 13px; margin-bottom: 10px; background: #fff5f5 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23b91c1c" viewBox="0 0 16 16"><path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/></svg>') no-repeat right 12px center; 
+    color: #b91c1c; font-weight: bold; text-align: left; outline: none; cursor: pointer; 
+    -webkit-appearance: none; appearance: none; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.1); transition: 0.2s;
+}
+.select-penalty:focus { border-color: #ef4444; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3); }
+
+.penalty-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 
 .fast-select-group { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; justify-content: center; }
 .btn-select { flex: 1; min-width: 45%; background: #f1f5f9; color: #475569; border: 1px solid var(--border); padding: 12px; font-size: 14px; border-radius: 8px; }
@@ -65,17 +69,17 @@ button { padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-
 .history-table th { background: #f1f5f9; }
 .history-detail { font-size: 11px; display: block; margin-top: 3px; }
 
-/* ÇEKMECE VE HESAP MAKİNESİ */
 .bottom-drawer {
     position: fixed; bottom: 0; left: 0; right: 0; margin: 0 auto; max-width: 600px; 
     background: var(--card-bg); border-top: 3px solid var(--primary); border-radius: 20px 20px 0 0;
     box-shadow: 0 -5px 20px rgba(0,0,0,0.15); transform: translateY(100%); transition: transform 0.3s ease-in-out; z-index: 1000;
 }
-.bottom-drawer.open { transform: translateY(0); }
+.bottom-drawer.open { transform: translateY(0); z-index: 1001; }
 
 .drawer-toggle {
     position: absolute; top: -45px; border: none; border-radius: 12px 12px 0 0;
     padding: 12px 20px; font-size: 14px; font-weight: bold; width: auto; cursor: pointer; box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    transition: opacity 0.2s;
 }
 .toggle-calc { left: 10px; background: #8b5cf6; color: white; }
 .toggle-score { right: 10px; background: var(--primary); color: white; }
@@ -92,7 +96,14 @@ button { padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-
 .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .calc-btn { background: #e2e8f0; color: #334155; font-size: 18px; padding: 15px; }
 .calc-btn-op { background: #cbd5e1; color: var(--primary); }
-.calc-btn-eq { background: var(--success); color: white; } /* GÜNCELLENDİ: Span kaldırıldı */
+.calc-btn-eq { background: var(--success); color: white; }
 .calc-btn-c { background: var(--danger); color: white; }
+
+.footer-info {
+    text-align: center; padding: 15px; font-size: 12px; color: #64748b; 
+    margin-top: 10px; border-top: 1px solid var(--border);
+    display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.footer-badge { background: #f1f5f9; padding: 5px 10px; border-radius: 20px; border: 1px solid var(--border); }
 
 @media (max-width: 450px) { .players-grid { grid-template-columns: 1fr; } }
