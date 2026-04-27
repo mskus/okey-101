@@ -1,13 +1,38 @@
-// === FIREBASE BAĞLANTISI ===
 const firebaseConfig = { databaseURL: "https://okey-ef015-default-rtdb.europe-west1.firebasedatabase.app/" };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const gameRef = db.ref('canliMasa'); 
 
+let activeUsers = 0;
+let clientIP = "Yükleniyor...";
+let deviceType = (/Android/i.test(navigator.userAgent)) ? "📱 Android" : (/iPhone|iPad|iPod/i.test(navigator.userAgent)) ? "📱 iOS" : (/Windows/i.test(navigator.userAgent)) ? "💻 Windows" : (/Mac/i.test(navigator.userAgent)) ? "💻 MacOS" : "Cihaz";
+
+fetch('https://api.ipify.org?format=json').then(r => r.json()).then(d => { 
+    clientIP = d.ip; 
+    let el = document.getElementById('client-ip'); if(el) el.innerText = clientIP;
+}).catch(() => { 
+    clientIP = "Bulunamadı"; 
+    let el = document.getElementById('client-ip'); if(el) el.innerText = clientIP;
+});
+
+const presenceRef = db.ref('onlineUsers');
+db.ref('.info/connected').on('value', snap => {
+    if (snap.val() === true) {
+        let conn = presenceRef.push();
+        conn.onDisconnect().remove();
+        conn.set(true);
+    }
+});
+presenceRef.on('value', snap => {
+    activeUsers = snap.numChildren();
+    let el = document.getElementById('active-users-count');
+    if(el) el.innerText = activeUsers;
+});
+
 function getInitialRound() {
     return {
-        p0: { opened: false, double: false, score: "" }, p1: { opened: false, double: false, score: "" },
-        p2: { opened: false, double: false, score: "" }, p3: { opened: false, double: false, score: "" },
+        p0: { double: false, score: "" }, p1: { double: false, score: "" },
+        p2: { double: false, score: "" }, p3: { double: false, score: "" },
         winner: "-1", winType: "normal"
     };
 }
@@ -20,7 +45,7 @@ let state = {
 
 let uiState = { showScoreboard: false, showCalc: false, calcValue: "" };
 let isDataLoaded = false;
-let timerInterval = null; // Canlı sayaç
+let timerInterval = null;
 
 gameRef.on('value', (snapshot) => {
     const data = snapshot.val();
@@ -28,7 +53,6 @@ gameRef.on('value', (snapshot) => {
     isDataLoaded = true;
     render();
     
-    // Masa açıkken sayacı başlat
     if(state.screen === 'game' && state.startTime && !timerInterval) {
         timerInterval = setInterval(updateLiveTimer, 1000);
     } else if (state.screen === 'setup' && timerInterval) {
@@ -37,16 +61,9 @@ gameRef.on('value', (snapshot) => {
     }
 });
 
-function saveState() {
-    if (isDataLoaded) gameRef.set(state);
-}
+function saveState() { if (isDataLoaded) gameRef.set(state); }
+function getPlayerName(idx) { return state.players[idx] && state.players[idx].trim() !== "" ? state.players[idx] : `Oyuncu ${idx+1}`; }
 
-// === OYUNCU VE TAKIM İSMİ YÖNETİMİ ===
-function getPlayerName(idx) {
-    return state.players[idx] && state.players[idx].trim() !== "" ? state.players[idx] : `Oyuncu ${idx+1}`;
-}
-
-// Yeni: Ali & Ayşe formatında takım ismi oluşturur
 function getTeamName(teamIdx) {
     let p1 = getPlayerName(teamIdx === 0 ? 0 : 2).split(' ')[0];
     let p2 = getPlayerName(teamIdx === 0 ? 1 : 3).split(' ')[0];
@@ -55,42 +72,24 @@ function getTeamName(teamIdx) {
     return `${p1} & ${p2}`;
 }
 
-// Arşivler için Takım İsmi (Önceki oyuncuların ismini alır)
 function getArchiveTeamName(archObj, teamIdx) {
     let p1 = (archObj.players[teamIdx === 0 ? 0 : 2] || `Oyuncu ${teamIdx === 0 ? 1 : 3}`).split(' ')[0];
     let p2 = (archObj.players[teamIdx === 0 ? 1 : 3] || `Oyuncu ${teamIdx === 0 ? 2 : 4}`).split(' ')[0];
     return `${p1} & ${p2}`;
 }
 
-// === AKSİYON FONKSİYONLARI ===
-window.handleScoreInput = function(idx, value) {
-    state.currentRound[`p${idx}`].score = value;
-    saveState();
-};
+window.handleScoreInput = function(idx, value) { state.currentRound[`p${idx}`].score = value; saveState(); };
+window.toggleState = function(idx, field) { state.currentRound[`p${idx}`][field] = !state.currentRound[`p${idx}`][field]; saveState(); };
 
-window.toggleState = function(idx, field) {
-    state.currentRound[`p${idx}`][field] = !state.currentRound[`p${idx}`][field];
-    if (field === 'double' && state.currentRound[`p${idx}`].double) {
-        state.currentRound[`p${idx}`].opened = true;
-    }
-    saveState();
+window.handleQuickPenalty = function(idx, selectEl) {
+    let val = parseInt(selectEl.value);
+    if (!isNaN(val)) { addPenalty(idx, val, `+${val}`); selectEl.value = ""; }
 };
 
 window.setMode = function(mode) { state.mode = mode; saveState(); }
+window.setWinner = function(val) { state.currentRound.winner = val; if (val === "-1") { calculateRound(); return; } saveState(); };
+window.setWinType = function(val) { if (state.currentRound.winner === "-1") return; state.currentRound.winType = val; calculateRound(); };
 
-window.setWinner = function(val) {
-    state.currentRound.winner = val;
-    if (val === "-1") { calculateRound(); return; }
-    saveState();
-};
-
-window.setWinType = function(val) {
-    if (state.currentRound.winner === "-1") return; 
-    state.currentRound.winType = val;
-    calculateRound();
-};
-
-// === HESAP MAKİNESİ VE ÇEKMECE KONTROLLERİ ===
 window.toggleScoreboard = function() {
     uiState.showScoreboard = !uiState.showScoreboard;
     if(uiState.showScoreboard) uiState.showCalc = false; 
@@ -104,20 +103,22 @@ window.toggleCalc = function() {
 };
 
 function updateDrawers() {
-    document.getElementById('score-drawer')?.classList.toggle('open', uiState.showScoreboard);
-    document.getElementById('calc-drawer')?.classList.toggle('open', uiState.showCalc);
+    const scoreD = document.getElementById('score-drawer');
+    const calcD = document.getElementById('calc-drawer');
+    if(scoreD) scoreD.classList.toggle('open', uiState.showScoreboard);
+    if(calcD) calcD.classList.toggle('open', uiState.showCalc);
     if(document.getElementById('score-icon')) document.getElementById('score-icon').innerText = uiState.showScoreboard ? '▼' : '▲';
     if(document.getElementById('calc-icon')) document.getElementById('calc-icon').innerText = uiState.showCalc ? '▼' : '▲';
+    const btnCalc = document.querySelector('.toggle-calc');
+    const btnScore = document.querySelector('.toggle-score');
+    if(btnCalc) btnCalc.style.visibility = uiState.showScoreboard ? 'hidden' : 'visible';
+    if(btnScore) btnScore.style.visibility = uiState.showCalc ? 'hidden' : 'visible';
 }
 
 window.calcPress = function(val) { uiState.calcValue += val; document.getElementById('calc-display').value = uiState.calcValue; };
 window.calcClear = function() { uiState.calcValue = ""; document.getElementById('calc-display').value = uiState.calcValue; };
-window.calcEval = function() {
-    try { uiState.calcValue = eval(uiState.calcValue).toString(); document.getElementById('calc-display').value = uiState.calcValue; } 
-    catch(e) { document.getElementById('calc-display').value = "Hata"; uiState.calcValue = ""; }
-};
+window.calcEval = function() { try { uiState.calcValue = eval(uiState.calcValue).toString(); document.getElementById('calc-display').value = uiState.calcValue; } catch(e) { document.getElementById('calc-display').value = "Hata"; uiState.calcValue = ""; } };
 
-// === CANLI SÜRE GÜNCELLEYİCİ ===
 function updateLiveTimer() {
     if(!state.startTime) return;
     const timerEl = document.getElementById('live-timer');
@@ -130,7 +131,6 @@ function updateLiveTimer() {
     }
 }
 
-// === HESAPLAMA MOTORU ===
 window.calculateRound = function() {
     let winnerIdx = parseInt(state.currentRound.winner);
     let winType = state.currentRound.winType;
@@ -151,8 +151,9 @@ window.calculateRound = function() {
         }
         if (state.mode === 'team' && i === partnerIdx) { roundScores[i] = 0; continue; }
 
-        let basePenalty = !p.opened ? 202 : (parseInt(p.score) || 0);
+        let basePenalty = (p.score === "") ? 202 : (parseInt(p.score) || 0);
         let mult = 1;
+        
         if (p.double) mult *= 2; 
         if (winnerWentDouble) mult *= 2; 
         if (winType === 'joker' || winType === 'elden') mult *= 2; 
@@ -164,7 +165,6 @@ window.calculateRound = function() {
     for (let i = 0; i < 4; i++) state.totals[i] += roundScores[i];
     
     let typeLabels = { "normal": "Normal", "joker": "Joker", "elden": "Elden", "elden_joker": "Elden+Jkr" };
-    
     let pColor = state.mode === 'team' ? ((winnerIdx==0 || winnerIdx==1)?'text-team-a':'text-team-b') : '';
     let detailText = winnerIdx === -1 ? "Kimse Bitemedi" : `<span class="${pColor}">${getPlayerName(winnerIdx)}</span> (${typeLabels[winType]})`;
 
@@ -190,13 +190,10 @@ window.askCustomPenalty = function(idx) {
     if (amt && !isNaN(amt)) addPenalty(idx, parseInt(amt), 'Ceza');
 };
 
-// === SIFIRLA VE ARŞİVE AL (FİREBASE SENKRONU) ===
 window.finishAndArchive = function() {
     if(!confirm('Oyun sıfırlanacak ve veritabanı arşivine eklenecek, emin misiniz?')) return;
     
-    // Geçen Süreyi Hesapla (Dakika)
     let durationMins = state.startTime ? Math.floor((Date.now() - state.startTime) / 60000) : 0;
-    
     if(!state.archives) state.archives = [];
     state.archives.push({ 
         date: new Date().toLocaleString('tr-TR'), mode: state.mode, 
@@ -204,13 +201,8 @@ window.finishAndArchive = function() {
         duration: durationMins
     });
     
-    state.screen = 'setup';
-    state.startTime = null;
-    state.players = ["", "", "", ""];
-    state.totals = [0, 0, 0, 0];
-    state.history = [];
-    state.currentRound = getInitialRound();
-    
+    state.screen = 'setup'; state.startTime = null; state.players = ["", "", "", ""];
+    state.totals = [0, 0, 0, 0]; state.history = []; state.currentRound = getInitialRound();
     saveState();
 };
 
@@ -223,11 +215,17 @@ function getStats(pIdx1, pIdx2 = -1) {
     return { wins, pens };
 }
 
-// === RENDER EKRANI ===
 window.render = function() {
     const app = document.getElementById('app');
     
-    // ----- KURULUM VE ARŞİV EKRANI -----
+    const footerHTML = `
+        <div class="footer-info">
+            <div class="footer-badge">🟢 Çevrimiçi: <strong id="active-users-count" style="color:var(--success);">${activeUsers}</strong></div>
+            <div class="footer-badge">${deviceType}</div>
+            <div class="footer-badge">IP: <strong id="client-ip">${clientIP}</strong></div>
+        </div>
+    `;
+
     if (state.screen === 'setup') {
         app.innerHTML = `
             <div class="card">
@@ -243,23 +241,18 @@ window.render = function() {
             </div>
             
             <div class="card">
-                <h3>Bulut Maç Arşivi (Herkes Görür)</h3>
+                <h3>Bulut Maç Arşivi</h3>
                 ${(!state.archives || state.archives.length === 0) ? '<p style="text-align:center; font-size:13px; color:#94a3b8; margin-top:10px;">Henüz tamamlanmış maç yok.</p>' : state.archives.slice().reverse().map((a) => {
-                    let isTeam = a.mode === 'team';
-                    let tA = a.totals[0] + a.totals[1];
-                    let tB = a.totals[2] + a.totals[3];
-                    let winnerText = "";
-                    let bgClass = "";
+                    let isTeam = a.mode === 'team'; let tA = a.totals[0] + a.totals[1]; let tB = a.totals[2] + a.totals[3];
+                    let winnerText = ""; let bgClass = "";
                     
                     if(isTeam) {
-                        let teamA = getArchiveTeamName(a, 0);
-                        let teamB = getArchiveTeamName(a, 1);
+                        let teamA = getArchiveTeamName(a, 0); let teamB = getArchiveTeamName(a, 1);
                         if(tA < tB) { winnerText = `🏆 ${teamA}`; bgClass = "bg-team-a-light border-team-a"; }
                         else if(tB < tA) { winnerText = `🏆 ${teamB}`; bgClass = "bg-team-b-light border-team-b"; }
                         else winnerText = "🤝 Berabere";
                     } else {
-                        let min = Math.min(...a.totals);
-                        let wIdx = a.totals.indexOf(min);
+                        let min = Math.min(...a.totals); let wIdx = a.totals.indexOf(min);
                         winnerText = `🏆 ${a.players[wIdx] || 'Oyuncu ' + (wIdx+1)}`;
                     }
                     
@@ -272,11 +265,12 @@ window.render = function() {
                         ${isTeam ? `<span class="${tA < tB ? 'text-team-a' : ''}">${getArchiveTeamName(a,0)}: ${tA}</span> | <span class="${tB < tA ? 'text-team-b' : ''}">${getArchiveTeamName(a,1)}: ${tB}</span>` : a.totals.join(' | ')}
                     </div>`
                 }).join('')}
-            </div>`;
+            </div>
+            ${footerHTML}
+        `;
         return;
     }
 
-    // ----- OYUN EKRANI -----
     let scoreboardHTML = "";
     if(state.mode === 'team') {
         let sA = getStats(0, 1); let sB = getStats(2, 3);
@@ -308,6 +302,9 @@ window.render = function() {
     let btnA = state.mode === 'team' ? 'bg-team-a-light text-team-a' : '';
     let btnB = state.mode === 'team' ? 'bg-team-b-light text-team-b' : '';
 
+    let penaltyOptions = `<option value="">+ Hızlı Ceza Seç</option>`;
+    for(let v=10; v<=260; v+=10) penaltyOptions += `<option value="${v}">+${v} Ceza</option>`;
+
     app.innerHTML = `
         <div class="card">
             <h2 style="margin:0; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
@@ -318,14 +315,17 @@ window.render = function() {
                 ${[0,1,2,3].map(i => `
                     <div class="player-card ${state.mode==='team'?(i<2?'border-team-a':'border-team-b'):''}">
                         <h4 class="${state.mode==='team'?(i<2?'text-team-a':'text-team-b'):''}">${getPlayerName(i).substring(0,12)}</h4>
-                        <div class="toggle-row">
-                            <button class="btn-toggle ${state.currentRound[`p${i}`].opened ? 'active' : ''}" style="flex:1;" onclick="toggleState(${i}, 'opened')">Açtı</button>
-                            <button class="btn-toggle ${state.currentRound[`p${i}`].double ? 'active' : ''}" style="flex:1;" onclick="toggleState(${i}, 'double')">Çift</button>
-                        </div>
-                        <input type="number" id="score-input-${i}" placeholder="Eldeki Sayı" value="${state.currentRound[`p${i}`].score}" ${!state.currentRound[`p${i}`].opened?'disabled':''} onchange="handleScoreInput(${i}, this.value)">
+                        
+                        <button class="btn-toggle ${state.currentRound[`p${i}`].double ? 'active' : ''}" style="width:100%; margin-bottom:10px;" onclick="toggleState(${i}, 'double')">Çifte Gitti</button>
+                        <input type="number" id="score-input-${i}" placeholder="Eldeki Sayı (Boş=202)" value="${state.currentRound[`p${i}`].score}" onchange="handleScoreInput(${i}, this.value)">
+                        
+                        <select class="select-penalty" onchange="handleQuickPenalty(${i}, this)">
+                            ${penaltyOptions}
+                        </select>
+
                         <div class="penalty-actions">
                             <button class="btn-danger btn-small" onclick="addPenalty(${i}, 101, '+101')">+101</button>
-                            <button class="btn-outline btn-small" onclick="askCustomPenalty(${i})">Ceza</button>
+                            <button class="btn-outline btn-small" onclick="askCustomPenalty(${i})">Özel</button>
                         </div>
                     </div>`).join('')}
             </div>
@@ -365,15 +365,10 @@ window.render = function() {
                     <tbody>${(state.history || []).slice().reverse().map(h=> {
                         if(h.type === 'round') {
                             let rowClass = (state.mode === 'team' && h.winnerIdx !== "-1") ? ((h.winnerIdx == 0 || h.winnerIdx == 1) ? 'history-team-a' : 'history-team-b') : '';
-                            return `
-                            <tr class="${rowClass}">
-                                <td><strong>${h.roundNum}</strong><span class="history-detail">${h.details}</span></td>
-                                ${h.scores.map(s=>`<td>${s}</td>`).join('')}
-                            </tr>`;
+                            return `<tr class="${rowClass}"><td><strong>${h.roundNum}</strong><span class="history-detail">${h.details}</span></td>${h.scores.map(s=>`<td>${s}</td>`).join('')}</tr>`;
                         } else {
                             let pClass = state.mode === 'team' ? ((h.playerIdx == 0 || h.playerIdx == 1) ? 'text-team-a' : 'text-team-b') : '';
-                            return `
-                            <tr style="background:#fee2e2"><td colspan="5" style="text-align:left; padding-left:10px;"><strong class="${pClass}">${getPlayerName(h.playerIdx)}</strong>: ${h.amount} (${h.reason})</td></tr>`;
+                            return `<tr style="background:#fee2e2"><td colspan="5" style="text-align:left; padding-left:10px;"><strong class="${pClass}">${getPlayerName(h.playerIdx)}</strong>: ${h.amount} (${h.reason})</td></tr>`;
                         }
                     }).join('')}
                     </tbody>
@@ -405,8 +400,8 @@ window.render = function() {
                 ${scoreboardHTML}
             </div>
         </div>
+        ${footerHTML}
     `;
     updateDrawers(); 
-    // Sayaç DOM'a yeni basıldı, hemen bir kere tetikle
     updateLiveTimer(); 
 };
