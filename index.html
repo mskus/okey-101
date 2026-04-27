@@ -48,6 +48,32 @@
         </div>
     </div>
 
+    <!-- Delete Room Password Modal -->
+    <div id="delete-modal" class="modal-overlay">
+        <div class="modal-card">
+            <h3>🗑️ Masa Sil</h3>
+            <p>Bu şifreli masayı silmek için şifreyi girin.</p>
+            <input type="password" id="delete-modal-input" placeholder="Masa Şifresi">
+            <div class="modal-actions">
+                <button class="btn-outline" onclick="closeDeleteModal()">İptal</button>
+                <button class="btn-danger" onclick="confirmDeleteWithPassword()">Sil</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Adisyon Price Edit Modal -->
+    <div id="adisyon-price-modal" class="modal-overlay">
+        <div class="modal-card">
+            <h3>✏️ Fiyat Düzenle</h3>
+            <p id="adisyon-price-desc"></p>
+            <input type="number" id="adisyon-price-input" placeholder="Yeni Fiyat (₺)">
+            <div class="modal-actions">
+                <button class="btn-outline" onclick="closeAdisyonPriceModal()">İptal</button>
+                <button class="btn-primary" onclick="confirmAdisyonPriceEdit()">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>

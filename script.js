@@ -10,6 +10,45 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 /* ============================================
+   CONSTANTS
+   ============================================ */
+const WIN_SCORES = {
+    normal: -101,
+    joker: -202,
+    elden: -202,
+    elden_joker: -404
+};
+
+const TYPE_LABELS = {
+    normal: "Normal",
+    joker: "Joker",
+    elden: "Elden",
+    elden_joker: "Elden+Jkr"
+};
+
+const MULTIPLIERS = {
+    normal: 1,
+    joker: 2,
+    elden: 2,
+    elden_joker: 4
+};
+
+const DEFAULT_ADISYON_ITEMS = [
+    { id: 'cay', name: 'Çay', icon: '🍵', price: 15, qty: 0 },
+    { id: 'su', name: 'Su', icon: '💧', price: 10, qty: 0 },
+    { id: 'tost', name: 'Tost', icon: '🥪', price: 45, qty: 0 },
+    { id: 'kahve', name: 'Kahve', icon: '☕', price: 35, qty: 0 },
+    { id: 'soda', name: 'Soda', icon: '🥤', price: 12, qty: 0 },
+    { id: 'cips', name: 'Cips', icon: '🥔', price: 25, qty: 0 },
+];
+
+const FUN_ADJECTIVES = ['Şanslı','Hızlı','Zeki','Cesur','Sihirli','Altın','Gümüş','Demir','Kral','Prens','Sultan','Efsane','Süper','Mega','Ultra'];
+const FUN_NOUNS = ['Aslan','Kartal','Kaplan','Kurt','Ayı','Ejderha','Şahin','Kobra','Leopar','Panter','Fırtına','Yıldırım','Ateş','Buz','Gölge'];
+
+const SCORE_EMPTY_PENALTY = 202;
+const SCORE_NORMAL_WIN = 101;
+
+/* ============================================
    UTILITIES
    ============================================ */
 const $ = (sel) => document.querySelector(sel);
@@ -20,10 +59,8 @@ function generateId() {
 }
 
 function generateFunName() {
-    const adjectives = ['Şanslı','Hızlı','Zeki','Cesur','Sihirli','Altın','Gümüş','Demir','Kral','Prens','Sultan','Efsane','Süper','Mega','Ultra'];
-    const nouns = ['Aslan','Kartal','Kaplan','Kurt','Ayı','Ejderha','Şahin','Kobra','Leopar','Panter','Fırtına','Yıldırım','Ateş','Buz','Gölge'];
-    const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
-    const noun = nouns[Math.floor(Math.random() * nouns.length)];
+    const adj = FUN_ADJECTIVES[Math.floor(Math.random() * FUN_ADJECTIVES.length)];
+    const noun = FUN_NOUNS[Math.floor(Math.random() * FUN_NOUNS.length)];
     const num = Math.floor(Math.random() * 900) + 100;
     return adj + noun + num;
 }
@@ -47,6 +84,7 @@ function setUserName(name) {
 
 function showToast(message, type = 'info') {
     const container = $('#toast-container');
+    if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
@@ -56,8 +94,9 @@ function showToast(message, type = 'info') {
 }
 
 function copyToClipboard(text) {
+    const onSuccess = () => showToast('Kopyalandı!', 'success');
     if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(() => showToast('Kopyalandı!', 'success'));
+        navigator.clipboard.writeText(text).then(onSuccess);
     } else {
         const ta = document.createElement('textarea');
         ta.value = text;
@@ -65,8 +104,17 @@ function copyToClipboard(text) {
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        showToast('Kopyalandı!', 'success');
+        onSuccess();
     }
+}
+
+function formatDuration(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const pad = (n) => n.toString().padStart(2, '0');
+    return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
 /* ============================================
@@ -98,6 +146,10 @@ let timerInterval = null;
 let editTargetIndex = null;
 let editTargetType = null;
 let pendingJoinRoomId = null;
+let pendingDeleteRoomId = null;
+let pendingAdisyonItemId = null;
+let prevTotals = [0, 0, 0, 0];
+let newHistoryIds = new Set();
 
 let uiState = { showScoreboard: false, showCalc: false, showAdisyon: false, calcValue: "" };
 
@@ -111,24 +163,21 @@ function getInitialRound() {
 
 function getInitialAdisyon() {
     return {
-        items: [
-            { id: 'cay', name: 'Çay', icon: '🍵', price: 15, qty: 0 },
-            { id: 'su', name: 'Su', icon: '💧', price: 10, qty: 0 },
-            { id: 'tost', name: 'Tost', icon: '🥪', price: 45, qty: 0 },
-            { id: 'kahve', name: 'Kahve', icon: '☕', price: 35, qty: 0 },
-            { id: 'soda', name: 'Soda', icon: '🥤', price: 12, qty: 0 },
-            { id: 'cips', name: 'Cips', icon: '🥔', price: 25, qty: 0 },
-        ],
+        items: JSON.parse(JSON.stringify(DEFAULT_ADISYON_ITEMS)),
         customTotal: 0
     };
 }
 
-let state = {
-    screen: 'setup', mode: 'single', startTime: null,
-    players: ["", "", "", ""], 
-    totals: [0, 0, 0, 0], history: [], archives: [], currentRound: getInitialRound(),
-    adisyon: getInitialAdisyon()
-};
+function getDefaultState() {
+    return {
+        screen: 'setup', mode: 'single', startTime: null,
+        players: ["", "", "", ""], 
+        totals: [0, 0, 0, 0], history: [], archives: [], currentRound: getInitialRound(),
+        adisyon: getInitialAdisyon()
+    };
+}
+
+let state = getDefaultState();
 
 /* ============================================
    PRESENCE — GLOBAL & ROOM
@@ -200,13 +249,7 @@ function createRoom() {
             createdAt: Date.now(),
             createdBy: currentUser
         },
-        state: {
-            screen: 'setup', mode: 'single', startTime: null,
-            players: ["", "", "", ""], 
-            totals: [0, 0, 0, 0], history: [], archives: [], 
-            currentRound: getInitialRound(),
-            adisyon: getInitialAdisyon()
-        }
+        state: getDefaultState()
     };
 
     db.ref('lobiler/' + roomId).set(roomData)
@@ -256,14 +299,9 @@ function leaveRoom() {
         clearInterval(timerInterval);
         timerInterval = null;
     }
-    state = {
-        screen: 'setup', mode: 'single', startTime: null,
-        players: ["", "", "", ""], 
-        totals: [0, 0, 0, 0], history: [], archives: [], 
-        currentRound: getInitialRound(),
-        adisyon: getInitialAdisyon()
-    };
+    state = getDefaultState();
     uiState = { showScoreboard: false, showCalc: false, showAdisyon: false, calcValue: "" };
+    prevTotals = [0, 0, 0, 0];
     renderLobby();
     showToast('Lobiye döndünüz.', 'info');
 }
@@ -303,7 +341,44 @@ function closePasswordModal() {
 }
 
 function deleteRoom(roomId) {
-    if (!confirm('Bu masayı silmek istediğinize emin misiniz?')) return;
+    db.ref('lobiler/' + roomId + '/meta').once('value').then(snap => {
+        const meta = snap.val();
+        if (meta && meta.password) {
+            pendingDeleteRoomId = roomId;
+            $('#delete-modal').classList.add('active');
+            $('#delete-modal-input').value = '';
+            $('#delete-modal-input').focus();
+        } else {
+            if (!confirm('Bu masayı silmek istediğinize emin misiniz?')) return;
+            performDelete(roomId);
+        }
+    });
+}
+
+function confirmDeleteWithPassword() {
+    const pass = $('#delete-modal-input').value.trim();
+    if (!pass) {
+        showToast('Şifre giriniz!', 'error');
+        return;
+    }
+    db.ref('lobiler/' + pendingDeleteRoomId + '/meta/password').once('value')
+        .then(snap => {
+            if (snap.val() === pass) {
+                closeDeleteModal();
+                performDelete(pendingDeleteRoomId);
+                pendingDeleteRoomId = null;
+            } else {
+                showToast('Yanlış şifre!', 'error');
+            }
+        });
+}
+
+function closeDeleteModal() {
+    $('#delete-modal').classList.remove('active');
+    pendingDeleteRoomId = null;
+}
+
+function performDelete(roomId) {
     db.ref('lobiler/' + roomId).remove()
         .then(() => showToast('Masa silindi.', 'success'))
         .catch(err => showToast('Silinemedi: ' + err.message, 'error'));
@@ -392,10 +467,6 @@ function updateDrawers() {
     if(scoreD) scoreD.classList.toggle('open', uiState.showScoreboard);
     if(calcD) calcD.classList.toggle('open', uiState.showCalc);
     if(adisD) adisD.classList.toggle('open', uiState.showAdisyon);
-
-    if($('#score-icon')) $('#score-icon').innerText = uiState.showScoreboard ? '▼' : '▲';
-    if($('#calc-icon')) $('#calc-icon').innerText = uiState.showCalc ? '▼' : '▲';
-    if($('#adisyon-icon')) $('#adisyon-icon').innerText = uiState.showAdisyon ? '▼' : '▲';
 }
 
 /* ============================================
@@ -403,18 +474,22 @@ function updateDrawers() {
    ============================================ */
 window.calcPress = function(val) { 
     uiState.calcValue += val; 
-    $('#calc-display').value = uiState.calcValue; 
+    const disp = $('#calc-display');
+    if(disp) disp.value = uiState.calcValue; 
 };
 window.calcClear = function() { 
     uiState.calcValue = ""; 
-    $('#calc-display').value = uiState.calcValue; 
+    const disp = $('#calc-display');
+    if(disp) disp.value = uiState.calcValue; 
 };
 window.calcEval = function() { 
     try { 
         uiState.calcValue = eval(uiState.calcValue).toString(); 
-        $('#calc-display').value = uiState.calcValue; 
+        const disp = $('#calc-display');
+        if(disp) disp.value = uiState.calcValue; 
     } catch(e) { 
-        $('#calc-display').value = "Hata"; 
+        const disp = $('#calc-display');
+        if(disp) disp.value = "Hata"; 
         uiState.calcValue = ""; 
     } 
 };
@@ -426,16 +501,12 @@ function updateLiveTimer() {
     if(!state.startTime) return;
     const timerEl = $('#live-timer');
     if(timerEl) {
-        let diff = Math.floor((Date.now() - state.startTime) / 1000);
-        let m = Math.floor(diff / 60).toString().padStart(2, '0');
-        let s = (diff % 60).toString().padStart(2, '0');
-        let h = Math.floor(diff / 3600);
-        timerEl.innerText = h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
+        timerEl.innerText = formatDuration(Date.now() - state.startTime);
     }
 }
 
 /* ============================================
-   ROUND CALCULATION (PRESERVED EXACTLY)
+   ROUND CALCULATION
    ============================================ */
 window.calculateRound = function() {
     let winnerIdx = parseInt(state.currentRound.winner);
@@ -450,39 +521,38 @@ window.calculateRound = function() {
     for (let i = 0; i < 4; i++) {
         let p = state.currentRound[`p${i}`];
         if (i === winnerIdx) {
-            if (winType === 'normal') roundScores[i] = -101;
-            else if (winType === 'joker' || winType === 'elden') roundScores[i] = -202;
-            else if (winType === 'elden_joker') roundScores[i] = -404;
+            roundScores[i] = WIN_SCORES[winType] || WIN_SCORES.normal;
             continue;
         }
         if (state.mode === 'team' && i === partnerIdx) { roundScores[i] = 0; continue; }
 
-        let basePenalty = (p.score === "") ? 202 : (parseInt(p.score) || 0);
+        let basePenalty = (p.score === "") ? SCORE_EMPTY_PENALTY : (parseInt(p.score) || 0);
         let mult = 1;
 
         if (p.double) mult *= 2; 
         if (winnerWentDouble) mult *= 2; 
-        if (winType === 'joker' || winType === 'elden') mult *= 2; 
-        if (winType === 'elden_joker') mult *= 4; 
+        mult *= (MULTIPLIERS[winType] || 1);
 
         roundScores[i] = basePenalty * mult;
     }
 
     for (let i = 0; i < 4; i++) state.totals[i] += roundScores[i];
 
-    let typeLabels = { "normal": "Normal", "joker": "Joker", "elden": "Elden", "elden_joker": "Elden+Jkr" };
-    let pColor = state.mode === 'team' ? ((winnerIdx==0 || winnerIdx==1)?'text-team-a':'text-team-b') : '';
-    let detailText = winnerIdx === -1 ? "Kimse Bitemedi" : `<span class="${pColor}">${getPlayerName(winnerIdx)}</span> (${typeLabels[winType]})`;
+    let pColor = state.mode === 'team' && winnerIdx >= 0 ? ((winnerIdx===0 || winnerIdx===1)?'text-team-a':'text-team-b') : '';
+    let detailText = winnerIdx === -1 ? "Kimse Bitemedi" : `<span class="${pColor}">${getPlayerName(winnerIdx)}</span> (${TYPE_LABELS[winType]})`;
 
     if (!state.history) state.history = [];
+    const entryId = generateId();
     state.history.push({ 
         type: 'round', 
-        id: generateId(),
+        id: entryId,
         roundNum: state.history.filter(h => h.type === 'round').length + 1, 
         scores: roundScores, 
         details: detailText, 
         winnerIdx: winnerIdx 
     });
+    newHistoryIds.add(entryId);
+    setTimeout(() => newHistoryIds.delete(entryId), 1200);
 
     state.currentRound = getInitialRound();
     saveState();
@@ -492,13 +562,16 @@ window.calculateRound = function() {
 window.addPenalty = function(idx, amt, reason) {
     state.totals[idx] += amt;
     if (!state.history) state.history = [];
+    const entryId = generateId();
     state.history.push({ 
         type: 'penalty', 
-        id: generateId(),
+        id: entryId,
         playerIdx: idx, 
         amount: amt, 
         reason: reason 
     });
+    newHistoryIds.add(entryId);
+    setTimeout(() => newHistoryIds.delete(entryId), 1200);
     saveState();
     showToast(`${getPlayerName(idx)}: ${amt} ceza eklendi`, 'warning');
 };
@@ -607,11 +680,11 @@ window.finishAndArchive = function() {
     state.archives.push({ 
         date: new Date().toLocaleString('tr-TR'), 
         mode: state.mode, 
-        players: state.players, 
-        totals: state.totals, 
-        history: state.history,
+        players: [...state.players], 
+        totals: [...state.totals], 
+        history: JSON.parse(JSON.stringify(state.history)),
         duration: durationMins,
-        adisyon: state.adisyon
+        adisyon: JSON.parse(JSON.stringify(state.adisyon))
     });
 
     state.screen = 'setup'; 
@@ -621,6 +694,7 @@ window.finishAndArchive = function() {
     state.history = []; 
     state.currentRound = getInitialRound();
     state.adisyon = getInitialAdisyon();
+    prevTotals = [0, 0, 0, 0];
     saveState();
     showToast('Maç arşive eklendi!', 'success');
 };
@@ -657,6 +731,39 @@ window.updateCustomTotal = function(val) {
     renderAdisyon();
 };
 
+window.editAdisyonPrice = function(itemId) {
+    if (!state.adisyon) state.adisyon = getInitialAdisyon();
+    const item = state.adisyon.items.find(i => i.id === itemId);
+    if (!item) return;
+    pendingAdisyonItemId = itemId;
+    $('#adisyon-price-desc').innerText = `${item.name} için yeni fiyat girin:`;
+    $('#adisyon-price-input').value = item.price;
+    $('#adisyon-price-modal').classList.add('active');
+    $('#adisyon-price-input').focus();
+};
+
+window.closeAdisyonPriceModal = function() {
+    $('#adisyon-price-modal').classList.remove('active');
+    pendingAdisyonItemId = null;
+};
+
+window.confirmAdisyonPriceEdit = function() {
+    if (!pendingAdisyonItemId) return;
+    const val = parseInt($('#adisyon-price-input').value);
+    if (isNaN(val) || val < 0) {
+        showToast('Geçersiz fiyat!', 'error');
+        return;
+    }
+    const item = state.adisyon.items.find(i => i.id === pendingAdisyonItemId);
+    if (item) {
+        item.price = val;
+        saveState();
+        renderAdisyon();
+        showToast(`${item.name} fiyatı ${val}₺ olarak güncellendi!`, 'success');
+    }
+    closeAdisyonPriceModal();
+};
+
 function getAdisyonTotal() {
     if (!state.adisyon) return 0;
     const itemsTotal = state.adisyon.items.reduce((sum, i) => sum + (i.price * i.qty), 0);
@@ -675,7 +782,10 @@ function renderAdisyon() {
             <div class="adisyon-item">
                 <div class="item-icon">${item.icon}</div>
                 <div class="item-name">${item.name}</div>
-                <div class="item-price">${item.price}₺</div>
+                <div class="item-price">
+                    ${item.price}₺
+                    <button class="edit-price-btn" onclick="editAdisyonPrice('${item.id}')">✏️</button>
+                </div>
                 <div class="adisyon-controls">
                     <button class="btn-danger btn-small" onclick="updateAdisyonQty('${item.id}', -1)">−</button>
                     <span class="qty">${item.qty}</span>
@@ -709,16 +819,19 @@ function renderLobby() {
         <div class="lobby-header screen-enter">
             <div class="logo">🎲</div>
             <h1>101 OKEY PRO</h1>
-            <p>Canlı Çoklu Masa Sistemi</p>
         </div>
 
-        <div class="card screen-enter" style="animation-delay:0.1s">
+        <div class="card screen-enter" style="animation-delay:0.05s">
             <div style="text-align:center; margin-bottom:16px;">
                 <div class="user-badge" onclick="editUserName()">
                     👤 <input type="text" id="user-name-input" value="${currentUser}" 
                         onchange="saveUserName(this.value)" onclick="event.stopPropagation()">
                 </div>
                 <p style="font-size:12px; color:var(--text-muted);">İsminizi değiştirmek için üzerine tıklayın</p>
+            </div>
+
+            <div class="lobby-info-text">
+                🎮 Masa kur, arkadaşlarını davet et, skorları takip et. Adisyonu ekle, oyunu daha keyifli hale getir!
             </div>
 
             <h3>🆕 Yeni Masa Kur</h3>
@@ -729,7 +842,7 @@ function renderLobby() {
             </div>
         </div>
 
-        <div class="card screen-enter" style="animation-delay:0.2s">
+        <div class="card screen-enter" style="animation-delay:0.15s">
             <h3>🚪 Aktif Masalar</h3>
             <div id="room-list" class="room-list">
                 <div class="loading-screen" style="min-height:auto; padding:30px;">
@@ -901,16 +1014,23 @@ window.render = function() {
     if(state.mode === 'team') {
         let sA = getStats(0, 1); 
         let sB = getStats(2, 3);
+        const teamATotal = state.totals[0]+state.totals[1];
+        const teamBTotal = state.totals[2]+state.totals[3];
+        const prevATotal = prevTotals[0]+prevTotals[1];
+        const prevBTotal = prevTotals[2]+prevTotals[3];
+        const flashA = teamATotal !== prevATotal ? 'score-flash' : '';
+        const flashB = teamBTotal !== prevBTotal ? 'score-flash' : '';
+
         scoreboardHTML = `
             <div class="score-box bg-team-a" style="grid-column: span 2;">
-                <h4>${getTeamName(0)}</h4><div class="total">${state.totals[0]+state.totals[1]}</div>
+                <h4>${getTeamName(0)}</h4><div class="total ${flashA}">${teamATotal}</div>
                 <div class="stat-detail" style="border-top:1px solid rgba(255,255,255,0.2); padding-top:8px; margin-top:8px;">
                     ${getPlayerName(0).substring(0,8)}: <strong>${state.totals[0]}</strong> | ${getPlayerName(1).substring(0,8)}: <strong>${state.totals[1]}</strong><br>
                     Biten El: ${sA.wins} | Yenen Ceza: ${sA.pens}
                 </div>
             </div>
             <div class="score-box bg-team-b" style="grid-column: span 2;">
-                <h4>${getTeamName(2)}</h4><div class="total">${state.totals[2]+state.totals[3]}</div>
+                <h4>${getTeamName(2)}</h4><div class="total ${flashB}">${teamBTotal}</div>
                 <div class="stat-detail" style="border-top:1px solid rgba(255,255,255,0.2); padding-top:8px; margin-top:8px;">
                     ${getPlayerName(2).substring(0,8)}: <strong>${state.totals[2]}</strong> | ${getPlayerName(3).substring(0,8)}: <strong>${state.totals[3]}</strong><br>
                     Biten El: ${sB.wins} | Yenen Ceza: ${sB.pens}
@@ -919,8 +1039,9 @@ window.render = function() {
     } else {
         scoreboardHTML = [0,1,2,3].map(i => {
             let s = getStats(i);
+            const flash = state.totals[i] !== prevTotals[i] ? 'score-flash' : '';
             return `<div class="score-box">
-                <h4>${getPlayerName(i).substring(0,8)}</h4><div class="total">${state.totals[i]}</div>
+                <h4>${getPlayerName(i).substring(0,8)}</h4><div class="total ${flash}">${state.totals[i]}</div>
                 <div class="stat-detail" style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">Biten: ${s.wins} | Cz: ${s.pens}</div>
             </div>`;
         }).join('');
@@ -929,14 +1050,25 @@ window.render = function() {
     let btnA = state.mode === 'team' ? 'bg-team-a-light text-team-a' : '';
     let btnB = state.mode === 'team' ? 'bg-team-b-light text-team-b' : '';
 
-    let penaltyOptions = `<option value="">+ Hızlı Ceza Seç</option>`;
+    let penaltyOptions = `<option value="">+ Hızlı Ceza</option>`;
     for(let v=10; v<=260; v+=10) penaltyOptions += `<option value="${v}">+${v} Ceza</option>`;
+
+    const historyRows = (state.history || []).slice().reverse().map((h, revIdx) => {
+        const realIdx = (state.history || []).length - 1 - revIdx;
+        const isNew = newHistoryIds.has(h.id) ? 'history-row-new' : '';
+        if(h.type === 'round') {
+            let rowClass = (state.mode === 'team' && h.winnerIdx !== -1) ? ((h.winnerIdx == 0 || h.winnerIdx == 1) ? 'history-team-a' : 'history-team-b') : '';
+            return `<tr class="${rowClass} ${isNew}"><td><strong>${h.roundNum}</strong><span class="history-detail">${h.details}</span></td>${h.scores.map(s=>`<td>${s}</td>`).join('')}<td><div class="history-actions"><button class="btn-edit" onclick="editHistoryEntry(${realIdx})">✏️</button><button class="btn-delete" onclick="deleteHistoryEntry(${realIdx})">🗑️</button></div></td></tr>`;
+        } else {
+            let pClass = state.mode === 'team' ? ((h.playerIdx == 0 || h.playerIdx == 1) ? 'text-team-a' : 'text-team-b') : '';
+            return `<tr class="${isNew}" style="background:rgba(239,68,68,0.1)"><td colspan="5" class="history-penalty-cell"><strong class="${pClass}">${getPlayerName(h.playerIdx)}</strong>: ${h.amount} (${h.reason})</td><td><div class="history-actions"><button class="btn-edit" onclick="editHistoryEntry(${realIdx})">✏️</button><button class="btn-delete" onclick="deleteHistoryEntry(${realIdx})">🗑️</button></div></td></tr>`;
+        }
+    }).join('');
 
     app.innerHTML = `
         <div class="game-header screen-enter">
             <div>
-                <h2>🎯 El Girişi</h2>
-                <div class="room-name">${roomName}</div>
+                <h2>🎯 ${roomName}</h2>
             </div>
             <div class="header-actions">
                 <span class="live-timer" id="live-timer">00:00</span>
@@ -951,24 +1083,26 @@ window.render = function() {
                     <div class="player-card ${state.mode==='team'?(i<2?'border-team-a':'border-team-b'):''}">
                         <h4 class="${state.mode==='team'?(i<2?'text-team-a':'text-team-b'):''}">${getPlayerName(i).substring(0,12)}</h4>
 
-                        <button class="btn-toggle ${state.currentRound[`p${i}`].double ? 'active' : ''}" style="width:100%; margin-bottom:10px;" onclick="toggleState(${i}, 'double')">Çifte Gitti</button>
-                        <input type="number" id="score-input-${i}" placeholder="Eldeki Sayı (Boş=202)" value="${state.currentRound[`p${i}`].score}" onchange="handleScoreInput(${i}, this.value)">
+                        <input type="number" id="score-input-${i}" placeholder="202" value="${state.currentRound[`p${i}`].score}" onchange="handleScoreInput(${i}, this.value)">
 
-                        <select class="select-penalty" onchange="handleQuickPenalty(${i}, this)">
-                            ${penaltyOptions}
-                        </select>
+                        <div class="penalty-actions">
+                            <select class="select-penalty" onchange="handleQuickPenalty(${i}, this)">
+                                ${penaltyOptions}
+                            </select>
+                            <button class="btn-toggle ${state.currentRound[`p${i}`].double ? 'active' : ''}" style="width:100%; margin-bottom:10px;" onclick="toggleState(${i}, 'double')">Çift</button>
+                        </div>
 
                         <div class="penalty-actions">
                             <button class="btn-danger btn-small" onclick="addPenalty(${i}, 101, '+101')">+101</button>
-                            <button class="btn-outline btn-small" onclick="askCustomPenalty(${i})">Özel</button>
+                            <button class="btn-outline btn-small" onclick="askCustomPenalty(${i})">Ceza</button>
                         </div>
                     </div>`).join('')}
             </div>
         </div>
 
         <div class="card screen-enter" style="border: 2px dashed var(--primary); background: rgba(139,92,246,0.05); animation-delay:0.15s">
-            <h3>🏁 Eli Bitir</h3>
-            <p style="font-size:12px; color:var(--text-muted); margin-bottom:8px; text-align:center;">Kim Bitti?</p>
+
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:8px; text-align:center;">🏁Kim Bitti?</p>
             <div class="winner-cols">
                 <div class="winner-col">
                     <button id="win-btn-0" class="btn-select btn-winner ${state.currentRound.winner == '0' ? 'active' : ''} ${btnA}" onclick="setWinner('0')">${getPlayerName(0).substring(0,8)}</button>
@@ -993,30 +1127,20 @@ window.render = function() {
         </div>
 
         <div class="card screen-enter" style="margin-bottom:30px; animation-delay:0.2s">
-            <h3>📜 Bu Maçın Geçmişi</h3>
+            <h3>📜 Geçmiş</h3>
             <div style="overflow-x:auto;">
                 <table class="history-table">
                     <thead><tr><th>El</th>${[0,1,2,3].map(i=>`<th>${getPlayerName(i).substring(0,6)}</th>`).join('')}<th>İşlem</th></tr></thead>
-                    <tbody>${(state.history || []).slice().reverse().map((h, revIdx) => {
-                        const realIdx = (state.history || []).length - 1 - revIdx;
-                        if(h.type === 'round') {
-                            let rowClass = (state.mode === 'team' && h.winnerIdx !== "-1") ? ((h.winnerIdx == 0 || h.winnerIdx == 1) ? 'history-team-a' : 'history-team-b') : '';
-                            return `<tr class="${rowClass}"><td><strong>${h.roundNum}</strong><span class="history-detail">${h.details}</span></td>${h.scores.map(s=>`<td>${s}</td>`).join('')}<td><div class="history-actions"><button class="btn-edit" onclick="editHistoryEntry(${realIdx})">✏️</button><button class="btn-delete" onclick="deleteHistoryEntry(${realIdx})">🗑️</button></div></td></tr>`;
-                        } else {
-                            let pClass = state.mode === 'team' ? ((h.playerIdx == 0 || h.playerIdx == 1) ? 'text-team-a' : 'text-team-b') : '';
-                            return `<tr style="background:rgba(239,68,68,0.1)"><td colspan="4" style="text-align:left; padding-left:10px;"><strong class="${pClass}">${getPlayerName(h.playerIdx)}</strong>: ${h.amount} (${h.reason})</td><td><div class="history-actions"><button class="btn-edit" onclick="editHistoryEntry(${realIdx})">✏️</button><button class="btn-delete" onclick="deleteHistoryEntry(${realIdx})">🗑️</button></div></td></tr>`;
-                        }
-                    }).join('')}
-                    </tbody>
+                    <tbody>${historyRows}</tbody>
                 </table>
             </div>
-            <button class="btn-danger" style="margin-top: 15px;" onclick="finishAndArchive()">MAÇI SIFIRLA VE ARŞİVE AL</button>
+            <button class="btn-danger" style="margin-top: 15px;" onclick="finishAndArchive()">MAÇI BİTİR</button>
         </div>
 
+        ${footerHTML}
+
+        <!-- Drawers -->
         <div id="calc-drawer" class="bottom-drawer ${uiState.showCalc ? 'open' : ''}">
-            <button class="drawer-toggle toggle-calc" onclick="toggleCalc()">
-                🧮 Hesap Makinesi <span id="calc-icon">${uiState.showCalc ? '▼' : '▲'}</span>
-            </button>
             <div class="calc-container">
                 <input type="text" id="calc-display" class="calc-display" value="${uiState.calcValue}" readonly>
                 <div class="calc-grid">
@@ -1029,30 +1153,36 @@ window.render = function() {
         </div>
 
         <div id="score-drawer" class="bottom-drawer ${uiState.showScoreboard ? 'open' : ''}">
-            <button class="drawer-toggle toggle-score" onclick="toggleScoreboard()">
-                📊 Skor Tablosu <span id="score-icon">${uiState.showScoreboard ? '▼' : '▲'}</span>
-            </button>
             <div class="scoreboard ${state.mode==='team'?'team-mode':''}">
                 ${scoreboardHTML}
             </div>
         </div>
 
         <div id="adisyon-drawer" class="bottom-drawer ${uiState.showAdisyon ? 'open' : ''}">
-            <button class="drawer-toggle toggle-adisyon" onclick="toggleAdisyon()">
-                🧾 Adisyon <span id="adisyon-icon">${uiState.showAdisyon ? '▼' : '▲'}</span>
-            </button>
             <div id="adisyon-content" class="adisyon-container">
                 <!-- Rendered dynamically -->
             </div>
         </div>
 
-        ${footerHTML}
+        <!-- Drawer Bar -->
+        <div class="drawer-bar">
+            <button class="drawer-bar-btn calc ${uiState.showCalc ? 'active' : ''}" onclick="toggleCalc()">
+                🧮 Hesap Makinesi
+            </button>
+            <button class="drawer-bar-btn adisyon ${uiState.showAdisyon ? 'active' : ''}" onclick="toggleAdisyon()">
+                🧾 Adisyon
+            </button>
+            <button class="drawer-bar-btn score ${uiState.showScoreboard ? 'active' : ''}" onclick="toggleScoreboard()">
+                📊 Skor Tablosu
+            </button>
+        </div>
     `;
 
     updateDrawers(); 
     updateLiveTimer();
     renderAdisyon();
-}
+    prevTotals = [...state.totals];
+};
 
 /* ============================================
    ROOM LINK COPY
@@ -1101,6 +1231,8 @@ window.leaveRoom = leaveRoom;
 window.confirmJoinWithPassword = confirmJoinWithPassword;
 window.closePasswordModal = closePasswordModal;
 window.deleteRoom = deleteRoom;
+window.confirmDeleteWithPassword = confirmDeleteWithPassword;
+window.closeDeleteModal = closeDeleteModal;
 window.saveUserName = saveUserName;
 window.editHistoryEntry = editHistoryEntry;
 window.confirmEditScore = confirmEditScore;
@@ -1108,6 +1240,9 @@ window.closeEditModal = closeEditModal;
 window.deleteHistoryEntry = deleteHistoryEntry;
 window.updateAdisyonQty = updateAdisyonQty;
 window.updateCustomTotal = updateCustomTotal;
+window.editAdisyonPrice = editAdisyonPrice;
+window.closeAdisyonPriceModal = closeAdisyonPriceModal;
+window.confirmAdisyonPriceEdit = confirmAdisyonPriceEdit;
 window.copyRoomLink = copyRoomLink;
 window.calculateRound = calculateRound;
 window.addPenalty = addPenalty;
