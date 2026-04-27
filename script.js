@@ -4,7 +4,6 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const gameRef = db.ref('canliMasa'); 
 
-// === UYGULAMA VE UI DURUMU ===
 function getInitialRound() {
     return {
         p0: { opened: false, double: false, score: "" }, p1: { opened: false, double: false, score: "" },
@@ -14,27 +13,53 @@ function getInitialRound() {
 }
 
 let state = {
-    screen: 'setup', mode: 'single',
-    players: ["", "", "", ""], // Default Boş!
-    totals: [0, 0, 0, 0], history: [], currentRound: getInitialRound()
+    screen: 'setup', mode: 'single', startTime: null,
+    players: ["", "", "", ""], 
+    totals: [0, 0, 0, 0], history: [], archives: [], currentRound: getInitialRound()
 };
 
 let uiState = { showScoreboard: false, showCalc: false, calcValue: "" };
 let isDataLoaded = false;
+let timerInterval = null; // Canlı sayaç
 
 gameRef.on('value', (snapshot) => {
     const data = snapshot.val();
     if (data) state = data;
     isDataLoaded = true;
     render();
+    
+    // Masa açıkken sayacı başlat
+    if(state.screen === 'game' && state.startTime && !timerInterval) {
+        timerInterval = setInterval(updateLiveTimer, 1000);
+    } else if (state.screen === 'setup' && timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
 });
 
 function saveState() {
     if (isDataLoaded) gameRef.set(state);
 }
 
+// === OYUNCU VE TAKIM İSMİ YÖNETİMİ ===
 function getPlayerName(idx) {
     return state.players[idx] && state.players[idx].trim() !== "" ? state.players[idx] : `Oyuncu ${idx+1}`;
+}
+
+// Yeni: Ali & Ayşe formatında takım ismi oluşturur
+function getTeamName(teamIdx) {
+    let p1 = getPlayerName(teamIdx === 0 ? 0 : 2).split(' ')[0];
+    let p2 = getPlayerName(teamIdx === 0 ? 1 : 3).split(' ')[0];
+    if(p1 === "Oyuncu") p1 += (teamIdx === 0 ? "1" : "3");
+    if(p2 === "Oyuncu") p2 += (teamIdx === 0 ? "2" : "4");
+    return `${p1} & ${p2}`;
+}
+
+// Arşivler için Takım İsmi (Önceki oyuncuların ismini alır)
+function getArchiveTeamName(archObj, teamIdx) {
+    let p1 = (archObj.players[teamIdx === 0 ? 0 : 2] || `Oyuncu ${teamIdx === 0 ? 1 : 3}`).split(' ')[0];
+    let p2 = (archObj.players[teamIdx === 0 ? 1 : 3] || `Oyuncu ${teamIdx === 0 ? 2 : 4}`).split(' ')[0];
+    return `${p1} & ${p2}`;
 }
 
 // === AKSİYON FONKSİYONLARI ===
@@ -79,10 +104,10 @@ window.toggleCalc = function() {
 };
 
 function updateDrawers() {
-    document.getElementById('score-drawer').classList.toggle('open', uiState.showScoreboard);
-    document.getElementById('calc-drawer').classList.toggle('open', uiState.showCalc);
-    document.getElementById('score-icon').innerText = uiState.showScoreboard ? '▼' : '▲';
-    document.getElementById('calc-icon').innerText = uiState.showCalc ? '▼' : '▲';
+    document.getElementById('score-drawer')?.classList.toggle('open', uiState.showScoreboard);
+    document.getElementById('calc-drawer')?.classList.toggle('open', uiState.showCalc);
+    if(document.getElementById('score-icon')) document.getElementById('score-icon').innerText = uiState.showScoreboard ? '▼' : '▲';
+    if(document.getElementById('calc-icon')) document.getElementById('calc-icon').innerText = uiState.showCalc ? '▼' : '▲';
 }
 
 window.calcPress = function(val) { uiState.calcValue += val; document.getElementById('calc-display').value = uiState.calcValue; };
@@ -91,6 +116,19 @@ window.calcEval = function() {
     try { uiState.calcValue = eval(uiState.calcValue).toString(); document.getElementById('calc-display').value = uiState.calcValue; } 
     catch(e) { document.getElementById('calc-display').value = "Hata"; uiState.calcValue = ""; }
 };
+
+// === CANLI SÜRE GÜNCELLEYİCİ ===
+function updateLiveTimer() {
+    if(!state.startTime) return;
+    const timerEl = document.getElementById('live-timer');
+    if(timerEl) {
+        let diff = Math.floor((Date.now() - state.startTime) / 1000);
+        let m = Math.floor(diff / 60).toString().padStart(2, '0');
+        let s = (diff % 60).toString().padStart(2, '0');
+        let h = Math.floor(diff / 3600);
+        timerEl.innerText = h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
+    }
+}
 
 // === HESAPLAMA MOTORU ===
 window.calculateRound = function() {
@@ -127,7 +165,6 @@ window.calculateRound = function() {
     
     let typeLabels = { "normal": "Normal", "joker": "Joker", "elden": "Elden", "elden_joker": "Elden+Jkr" };
     
-    // Kazanana takım rengini verme
     let pColor = state.mode === 'team' ? ((winnerIdx==0 || winnerIdx==1)?'text-team-a':'text-team-b') : '';
     let detailText = winnerIdx === -1 ? "Kimse Bitemedi" : `<span class="${pColor}">${getPlayerName(winnerIdx)}</span> (${typeLabels[winType]})`;
 
@@ -153,13 +190,27 @@ window.askCustomPenalty = function(idx) {
     if (amt && !isNaN(amt)) addPenalty(idx, parseInt(amt), 'Ceza');
 };
 
+// === SIFIRLA VE ARŞİVE AL (FİREBASE SENKRONU) ===
 window.finishAndArchive = function() {
-    if(!confirm('Oyun sıfırlanacak, emin misiniz? (Yerel arşive kaydedilir)')) return;
-    let arch = JSON.parse(localStorage.getItem('okey101Archives')) || [];
-    arch.push({ date: new Date().toLocaleString('tr-TR'), mode: state.mode, players: state.players, totals: state.totals, history: state.history });
-    localStorage.setItem('okey101Archives', JSON.stringify(arch));
+    if(!confirm('Oyun sıfırlanacak ve veritabanı arşivine eklenecek, emin misiniz?')) return;
     
-    state = { screen: 'setup', mode: 'single', players: ["", "", "", ""], totals: [0, 0, 0, 0], history: [], currentRound: getInitialRound() };
+    // Geçen Süreyi Hesapla (Dakika)
+    let durationMins = state.startTime ? Math.floor((Date.now() - state.startTime) / 60000) : 0;
+    
+    if(!state.archives) state.archives = [];
+    state.archives.push({ 
+        date: new Date().toLocaleString('tr-TR'), mode: state.mode, 
+        players: state.players, totals: state.totals, history: state.history,
+        duration: durationMins
+    });
+    
+    state.screen = 'setup';
+    state.startTime = null;
+    state.players = ["", "", "", ""];
+    state.totals = [0, 0, 0, 0];
+    state.history = [];
+    state.currentRound = getInitialRound();
+    
     saveState();
 };
 
@@ -176,66 +227,69 @@ function getStats(pIdx1, pIdx2 = -1) {
 window.render = function() {
     const app = document.getElementById('app');
     
+    // ----- KURULUM VE ARŞİV EKRANI -----
     if (state.screen === 'setup') {
-        let arch = JSON.parse(localStorage.getItem('okey101Archives')) || [];
         app.innerHTML = `
             <div class="card">
-                <h1>101 OKEY</h1>
+                <h1>101 OKEY PRO</h1>
                 <div class="fast-select-group" style="margin-bottom:20px;">
                     <button class="btn-select ${state.mode === 'single' ? 'active' : ''}" onclick="setMode('single')">Tekli Oyun</button>
                     <button class="btn-select ${state.mode === 'team' ? 'active' : ''}" onclick="setMode('team')">Eşli Oyun (1-2 / 3-4)</button>
                 </div>
                 ${state.players.map((p, i) => `
-                    <input type="text" value="${p}" onchange="state.players[${i}]=this.value; saveState();" placeholder="${i+1}. Oyuncu İsmi">
+                    <input type="text" value="${p}" onchange="state.players[${i}]=this.value; saveState();" placeholder="${i+1}. Oyuncu İsmi (Boş bırakılabilir)">
                 `).join('')}
-                <button class="btn-primary" style="margin-top:10px;" onclick="state.screen='game'; saveState();">MASAYI KUR</button>
+                <button class="btn-primary" style="margin-top:10px;" onclick="state.screen='game'; state.startTime=Date.now(); saveState();">MASAYI KUR</button>
             </div>
             
             <div class="card">
-                <h3>Geçmiş Maçlar Arşiv</h3>
-                ${arch.length === 0 ? '<p style="text-align:center; font-size:13px; color:#94a3b8;">Kayıt bulunamadı.</p>' : arch.reverse().map((a) => {
+                <h3>Bulut Maç Arşivi (Herkes Görür)</h3>
+                ${(!state.archives || state.archives.length === 0) ? '<p style="text-align:center; font-size:13px; color:#94a3b8; margin-top:10px;">Henüz tamamlanmış maç yok.</p>' : state.archives.slice().reverse().map((a) => {
                     let isTeam = a.mode === 'team';
                     let tA = a.totals[0] + a.totals[1];
                     let tB = a.totals[2] + a.totals[3];
                     let winnerText = "";
+                    let bgClass = "";
                     
                     if(isTeam) {
-                        if(tA < tB) winnerText = `<span class="text-team-a">🏆 Takım A</span>`;
-                        else if(tB < tA) winnerText = `<span class="text-team-b">🏆 Takım B</span>`;
+                        let teamA = getArchiveTeamName(a, 0);
+                        let teamB = getArchiveTeamName(a, 1);
+                        if(tA < tB) { winnerText = `🏆 ${teamA}`; bgClass = "bg-team-a-light border-team-a"; }
+                        else if(tB < tA) { winnerText = `🏆 ${teamB}`; bgClass = "bg-team-b-light border-team-b"; }
                         else winnerText = "🤝 Berabere";
                     } else {
                         let min = Math.min(...a.totals);
                         let wIdx = a.totals.indexOf(min);
-                        winnerText = `🏆 ${a.players[wIdx]}`;
+                        winnerText = `🏆 ${a.players[wIdx] || 'Oyuncu ' + (wIdx+1)}`;
                     }
                     
                     return `
-                    <div style="border:1px solid #e2e8f0; padding:10px; margin-bottom:10px; border-radius:8px; font-size:13px; background:#f8fafc;">
+                    <div class="${bgClass}" style="border:1px solid #e2e8f0; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; background:#f8fafc;">
                         <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:5px;">
-                            <strong style="color:var(--primary);">${a.date} - ${isTeam ? 'Eşli' : 'Tekli'}</strong>
-                            ${winnerText}
+                            <strong style="color:var(--primary);">${a.date} (${a.duration} dk)</strong>
+                            <strong>${winnerText}</strong>
                         </div>
-                        ${isTeam ? `<span class="${tA < tB ? 'text-team-a' : ''}">Takım A: ${tA}</span> | <span class="${tB < tA ? 'text-team-b' : ''}">Takım B: ${tB}</span>` : a.totals.join(' | ')}
+                        ${isTeam ? `<span class="${tA < tB ? 'text-team-a' : ''}">${getArchiveTeamName(a,0)}: ${tA}</span> | <span class="${tB < tA ? 'text-team-b' : ''}">${getArchiveTeamName(a,1)}: ${tB}</span>` : a.totals.join(' | ')}
                     </div>`
                 }).join('')}
             </div>`;
         return;
     }
 
-    // Skor Tablosu HTML - Çok Daha Detaylı
+    // ----- OYUN EKRANI -----
     let scoreboardHTML = "";
     if(state.mode === 'team') {
         let sA = getStats(0, 1); let sB = getStats(2, 3);
         scoreboardHTML = `
             <div class="score-box bg-team-a" style="grid-column: span 2;">
-                <h4>Takım A</h4><div class="total">${state.totals[0]+state.totals[1]}</div>
+                <h4>${getTeamName(0)}</h4><div class="total">${state.totals[0]+state.totals[1]}</div>
                 <div class="stat-detail" style="border-top:1px solid rgba(255,255,255,0.3); padding-top:8px; margin-top:8px;">
                     ${getPlayerName(0).substring(0,8)}: <strong>${state.totals[0]}</strong> | ${getPlayerName(1).substring(0,8)}: <strong>${state.totals[1]}</strong><br>
                     Biten El: ${sA.wins} | Yenen Ceza: ${sA.pens}
                 </div>
             </div>
             <div class="score-box bg-team-b" style="grid-column: span 2;">
-                <h4>Takım B</h4><div class="total">${state.totals[2]+state.totals[3]}</div>
+                <h4>${getTeamName(2)}</h4><div class="total">${state.totals[2]+state.totals[3]}</div>
                 <div class="stat-detail" style="border-top:1px solid rgba(255,255,255,0.3); padding-top:8px; margin-top:8px;">
                     ${getPlayerName(2).substring(0,8)}: <strong>${state.totals[2]}</strong> | ${getPlayerName(3).substring(0,8)}: <strong>${state.totals[3]}</strong><br>
                     Biten El: ${sB.wins} | Yenen Ceza: ${sB.pens}
@@ -256,6 +310,10 @@ window.render = function() {
 
     app.innerHTML = `
         <div class="card">
+            <h2 style="margin:0; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                El Girişi 
+                <span id="live-timer" style="font-size:12px; font-weight:normal; background:var(--primary); color:white; padding:4px 10px; border-radius:12px;">00:00</span>
+            </h2>
             <div class="players-grid">
                 ${[0,1,2,3].map(i => `
                     <div class="player-card ${state.mode==='team'?(i<2?'border-team-a':'border-team-b'):''}">
@@ -349,4 +407,6 @@ window.render = function() {
         </div>
     `;
     updateDrawers(); 
+    // Sayaç DOM'a yeni basıldı, hemen bir kere tetikle
+    updateLiveTimer(); 
 };
