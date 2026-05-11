@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#8b5cf6">
+    <meta name="description" content="101 Okey canlı masa, skor ve adisyon takibi.">
     <title>101 Okey Pro — Canlı Çoklu Masa</title>
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
@@ -24,10 +27,31 @@
 
     <!-- Edit Score Modal -->
     <div id="edit-modal" class="modal-overlay">
-        <div class="modal-card">
+        <div class="modal-card modal-card-edit">
             <h3>✏️ Skor Düzenle</h3>
-            <p id="edit-modal-desc"></p>
-            <input type="number" id="edit-modal-input" placeholder="Yeni Değer">
+            <p id="edit-modal-desc" class="edit-modal-desc"></p>
+            <div id="edit-modal-round-wrap" class="edit-modal-round-wrap" hidden>
+                <div class="edit-modal-score-field">
+                    <label id="edit-round-label-0" for="edit-round-score-0"></label>
+                    <input type="number" id="edit-round-score-0" inputmode="numeric" placeholder="0">
+                </div>
+                <div class="edit-modal-score-field">
+                    <label id="edit-round-label-1" for="edit-round-score-1"></label>
+                    <input type="number" id="edit-round-score-1" inputmode="numeric" placeholder="0">
+                </div>
+                <div class="edit-modal-score-field">
+                    <label id="edit-round-label-2" for="edit-round-score-2"></label>
+                    <input type="number" id="edit-round-score-2" inputmode="numeric" placeholder="0">
+                </div>
+                <div class="edit-modal-score-field">
+                    <label id="edit-round-label-3" for="edit-round-score-3"></label>
+                    <input type="number" id="edit-round-score-3" inputmode="numeric" placeholder="0">
+                </div>
+            </div>
+            <div id="edit-modal-penalty-wrap" class="edit-modal-penalty-wrap" hidden>
+                <label id="edit-penalty-label" for="edit-modal-input-penalty">Ceza puanı</label>
+                <input type="number" id="edit-modal-input-penalty" inputmode="numeric" placeholder="Yeni değer">
+            </div>
             <div class="modal-actions">
                 <button class="btn-outline" onclick="closeEditModal()">İptal</button>
                 <button class="btn-primary" onclick="confirmEditScore()">Kaydet</button>
@@ -75,5 +99,12 @@
     </div>
 
     <script src="script.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('./service-worker.js', { scope: './' }).catch(function () {});
+            });
+        }
+    </script>
 </body>
 </html>
