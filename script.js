@@ -42,9 +42,17 @@ const DEFAULT_ADISYON_ITEMS = [
     { id: 'cips', name: 'Cips', icon: '🥔', price: 25, qty: 0 },
 ];
 
-const FUN_ADJECTIVES = ['Şanslı','Hızlı','Zeki','Cesur','Sihirli','Altın','Gümüş','Demir','Kral','Prens','Sultan','Efsane','Süper','Mega','Ultra'];
-const FUN_NOUNS = ['Aslan','Kartal','Kaplan','Kurt','Ayı','Ejderha','Şahin','Kobra','Leopar','Panter','Fırtına','Yıldırım','Ateş','Buz','Gölge'];
+const FUN_ADJECTIVES = [
+    'Şanslı', 'Hızlı', 'Zeki', 'Cesur', 'Efsane', 'Gizemli', 'Uykusuz', 
+    'Agresif', 'Kurnaz', 'Çılgın', 'Komik', 'Acımasız', 'Tatlı', 'Racon', 
+    'Sessiz', 'Geveze', 'Zehir', 'Usta', 'Çaylak', 'Kıdemli', 'Afili', 'Atarlı'
+];
 
+const FUN_NOUNS = [
+    'Okeyci', 'Yancı', 'Iskata', 'Per', 'Çifte', 'Gösterge', 'Aslan', 'Kartal', 
+    'Vip', 'Patron', 'Dayı', 'Ağa', 'Reis', 'Kral', 'Kraliçe', 'Başkan', 
+    'Hayalet', 'Ninja', 'Şövalye', 'Samuray', 'Ejderha', 'Fırtına'
+];
 const SCORE_EMPTY_PENALTY = 202;
 const SCORE_NORMAL_WIN = 101;
 
@@ -89,16 +97,36 @@ const TOAST_ICONS = { success: '✅', error: '❌', info: 'ℹ️', warning: '�
 function showToast(message, type = 'info') {
     const container = $('#toast-container');
     if (!container) return;
-    audioManager.play(type); // toast türüne göre merkezi ses çal
+    audioManager.play(type); 
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.innerHTML = `
         <span>${TOAST_ICONS[type] || 'ℹ️'}</span>
         <span>${message}</span>
-        <div class="toast-progress"></div>
+        <div class="toast-progress" style="animation-duration: 3s;"></div>
     `;
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
+}
+
+// "Geri Al" butonu içeren özel toast gösterir; 5 sn sonra otomatik kapanır
+function showUndoToast(message, type = 'warning') {
+    const container = $('#toast-container');
+    if (!container) return;
+    clearUndoToastTimer();
+    const toast = document.createElement('div');
+    toast.className = `toast toast-undo ${type}`;
+    toast.innerHTML = `
+        <span>${TOAST_ICONS[type] || 'ℹ️'}</span>
+        <span class="toast-undo-msg">${message}</span>
+        <button type="button" class="btn-undo-toast" onclick="performUndo()">Geri Al</button>
+        <div class="toast-progress" style="animation-duration: 5s;"></div>
+    `;
+    container.appendChild(toast);
+    undoToastTimer = setTimeout(() => {
+        toast.remove();
+        undoToastTimer = null;
+    }, 5000);
 }
 
 // JSON serileştirme ile derin kopya alır (undo için anlık durum snapshot'ı)
@@ -114,24 +142,6 @@ function clearUndoToastTimer() {
     }
 }
 
-// "Geri Al" butonu içeren özel toast gösterir; 5 sn sonra otomatik kapanır
-function showUndoToast(message, type = 'warning') {
-    const container = $('#toast-container');
-    if (!container) return;
-    clearUndoToastTimer();
-    const toast = document.createElement('div');
-    toast.className = `toast toast-undo ${type}`;
-    toast.innerHTML = `
-        <span>${TOAST_ICONS[type] || 'ℹ️'}</span>
-        <span class="toast-undo-msg">${message}</span>
-        <button type="button" class="btn-undo-toast" onclick="performUndo()">Geri Al</button>
-    `;
-    container.appendChild(toast);
-    undoToastTimer = setTimeout(() => {
-        toast.remove();
-        undoToastTimer = null;
-    }, 5000);
-}
 
 // Önceki state snapshot'ına geri döner ve Firebase'e kaydeder
 window.performUndo = function() {
@@ -373,18 +383,33 @@ let state = getDefaultState();
 /* ============================================
    VARLIK (PRESENCE) — GLOBAL & ODA
    ============================================ */
-// Kullanıcı bağlandığında global varlık listesine ekler; bağlantı kopunca otomatik siler
 const globalPresenceRef = db.ref('onlineUsers');
+let globalConnRef = null;
+let currentRoomConnRef = null;
+window.roomActiveUsersList = []; // Odadaki aktif kullanıcı isimlerini tutmak için
+
+// Merkezileştirilmiş tek bağlantı dinleyicisi
 db.ref('.info/connected').on('value', snap => {
     if (snap.val() === true) {
-        let conn = globalPresenceRef.push();
-        conn.onDisconnect().remove();
-        conn.set({ name: currentUser, device: deviceType, time: Date.now() });
+        // Global bağlantıyı kur (varsa eskisini sil)
+        if (globalConnRef) globalConnRef.remove();
+        globalConnRef = globalPresenceRef.push();
+        globalConnRef.onDisconnect().remove();
+        globalConnRef.set({ name: currentUser, device: deviceType, time: Date.now() });
+
+        // Eğer kullanıcı bir odadaysa, bağlantı koptuğunda odaya da tekrar bağlan
+        if (currentRoomId && roomPresenceRef) {
+            if (currentRoomConnRef) currentRoomConnRef.remove();
+            currentRoomConnRef = roomPresenceRef.push();
+            currentRoomConnRef.onDisconnect().remove();
+            currentRoomConnRef.set({ name: currentUser, device: deviceType, time: Date.now() });
+        }
     }
 });
-// Global çevrimiçi sayısını izler ve footer'ı günceller
+
 globalPresenceRef.on('value', snap => {
-    activeUsersGlobal = snap.numChildren();
+    const val = snap.val() || {};
+    activeUsersGlobal = Object.keys(val).length;
     updateFooterCounts();
 });
 
@@ -392,35 +417,66 @@ globalPresenceRef.on('value', snap => {
 function attachRoomPresence(roomId) {
     if (roomPresenceRef) roomPresenceRef.off();
     roomPresenceRef = db.ref('lobiler/' + roomId + '/onlineUsers');
-    db.ref('.info/connected').on('value', snap => {
-        if (snap.val() === true && roomId) {
-            let conn = roomPresenceRef.push();
-            conn.onDisconnect().remove();
-            conn.set({ name: currentUser, device: deviceType, time: Date.now() });
-        }
-    });
+
+    // Eski oda bağlantısı varsa temizle (Ghost/Hayalet bağlantıları önler)
+    if (currentRoomConnRef) currentRoomConnRef.remove();
+
+    currentRoomConnRef = roomPresenceRef.push();
+    currentRoomConnRef.onDisconnect().remove();
+    currentRoomConnRef.set({ name: currentUser, device: deviceType, time: Date.now() });
+
     roomPresenceRef.on('value', snap => {
-        activeUsersRoom = snap.numChildren();
+        const val = snap.val() || {};
+        activeUsersRoom = Object.keys(val).length;
+        window.roomActiveUsersList = Object.values(val).map(u => u.name); // İsimleri listeye aktar
         updateFooterCounts();
     });
 }
 
-// Oda varlık dinleyicisini kapatır ve sayacı sıfırlar
+// Oda varlık dinleyicisini kapatır
 function detachRoomPresence() {
+    if (currentRoomConnRef) {
+        currentRoomConnRef.remove();
+        currentRoomConnRef.onDisconnect().cancel();
+        currentRoomConnRef = null;
+    }
     if (roomPresenceRef) {
         roomPresenceRef.off();
         roomPresenceRef = null;
     }
     activeUsersRoom = 0;
+    window.roomActiveUsersList = [];
     updateFooterCounts();
 }
 
-// Footer'daki çevrimiçi sayısını ve etiketini günceller
+// Footer'daki çevrimiçi sayısını, etiketini ve aktif kullanıcı isimlerini günceller
 function updateFooterCounts() {
     const el = $('#active-users-count');
     if (el) el.innerText = currentRoomId ? activeUsersRoom : activeUsersGlobal;
+    
     const label = $('#active-users-label');
     if (label) label.innerText = currentRoomId ? 'Bu Masada' : 'Çevrimiçi';
+
+    // Odadaki kullanıcıların isimlerini gösterme mantığı
+    let namesEl = $('#active-users-names');
+    if (currentRoomId && window.roomActiveUsersList && window.roomActiveUsersList.length > 0) {
+        // İsimlerde tekrarı önle
+        const uniqueNames = [...new Set(window.roomActiveUsersList)];
+        const namesStr = uniqueNames.join(', ');
+        
+        if (!namesEl) {
+            const pill = document.querySelector('.footer-pill--online');
+            if (pill) {
+                // Etiketin yanına, fazla uzun olursa üç nokta (...) ile kesecek bir stil ile ekliyoruz
+                pill.insertAdjacentHTML('beforeend', `<span id="active-users-names" style="margin-left:6px; font-weight:normal; font-size:11px; opacity:0.85; max-width:180px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${namesStr}">(${namesStr})</span>`);
+            }
+        } else {
+            namesEl.innerText = `(${namesStr})`;
+            namesEl.title = namesStr; // Fare ile üzerine gelince tam listeyi göstersin
+        }
+    } else {
+        if (namesEl) namesEl.remove(); // Lobiye dönüldüğünde isimleri kaldırır
+    }
 }
 
 /* ============================================
@@ -792,12 +848,34 @@ window.addPenalty = function(idx, amt, reason) {
 };
 
 window.askCustomPenalty = function(idx) {
-    const raw = prompt(`${getPlayerName(idx)} için özel ceza puanı (Örn: 50):`);
-    if (raw == null) return;
-    const amt = String(raw).trim();
+let pendingPenaltyPlayerIdx = null;
+
+window.askCustomPenalty = function(idx) {
+    pendingPenaltyPlayerIdx = idx;
+    const desc = $('#custom-penalty-desc');
+    const input = $('#custom-penalty-input');
+    if (desc) desc.textContent = `${getPlayerName(idx)} için özel ceza puanı girin:`;
+    if (input) input.value = '';
+    $('#custom-penalty-modal').classList.add('active');
+    if (input) input.focus();
+};
+
+window.closeCustomPenaltyModal = function() {
+    $('#custom-penalty-modal').classList.remove('active');
+    pendingPenaltyPlayerIdx = null;
+};
+
+window.confirmCustomPenalty = function() {
+    if (pendingPenaltyPlayerIdx === null) return;
+    const input = $('#custom-penalty-input');
+    const amt = input ? String(input.value).trim() : '';
     if (amt !== '' && !isNaN(amt)) {
-        addPenalty(idx, parseInt(amt, 10), 'Ceza');
+        addPenalty(pendingPenaltyPlayerIdx, parseInt(amt, 10), 'Ceza');
     }
+    closeCustomPenaltyModal();
+};
+
+
 };
 
 /* ============================================
@@ -1127,6 +1205,8 @@ function renderLobby() {
     `;
 
     loadRoomList();
+    updateFooterCounts();
+    
 }
 
 function editUserName() {
@@ -1560,13 +1640,17 @@ window.render = function() {
         </div>
     `;
 
+
     updateDrawers(); 
     updateLiveTimer();
     renderAdisyon();
     prevTotals = [...state.totals];
 
+    updateFooterCounts(); // EKLENECEK SATIR BURASI
+
     if (currentRoomId && state.screen === 'game') {
         attachChat(currentRoomId);
+        // ...
         const chatInput = $('#game-chat-input');
         if (chatInput) {
             chatInput.onkeydown = function (e) {
@@ -1579,6 +1663,7 @@ window.render = function() {
     } else {
         detachChat();
     }
+    
 };
 
 /* ============================================
@@ -1586,7 +1671,15 @@ window.render = function() {
    ============================================ */
 window.copyRoomLink = function() {
     if (!currentRoomId) return;
-    const url = window.location.origin + window.location.pathname + '?room=' + currentRoomId;
+    
+    // APK içindeyse (file://) ana domain'i manuel ver
+    let baseUrl = window.location.origin + window.location.pathname;
+    if (window.location.protocol === 'file:') {
+        baseUrl = 'https://mskus.github.io/okey-101/'; 
+    }
+    
+    const url = baseUrl + '?room=' + currentRoomId;
+    
     const modal = $('#invite-modal');
     const urlEl = $('#invite-url-text');
     const qrHost = $('#invite-qr-host');
@@ -1614,6 +1707,18 @@ window.copyRoomLink = function() {
         }
     }
     if (modal) modal.classList.add('active');
+};
+
+window.copyInviteUrlFromModal = function () {
+    if (!currentRoomId) return;
+    
+    let baseUrl = window.location.origin + window.location.pathname;
+    if (window.location.protocol === 'file:') {
+        baseUrl = 'https://mskus.github.io/okey-101/';
+    }
+    
+    const url = baseUrl + '?room=' + currentRoomId;
+    copyToClipboard(url);
 };
 
 window.closeInviteModal = function () {
@@ -1714,5 +1819,7 @@ window.setWinType = setWinType;
 window.toggleState = toggleState;
 window.toggleTheme = toggleTheme;
 window.toggleMute = toggleMute;
+window.closeCustomPenaltyModal = closeCustomPenaltyModal;
+window.confirmCustomPenalty = confirmCustomPenalty;
 
 init();

@@ -114,6 +114,17 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <div id="custom-penalty-modal" class="modal-overlay">
+        <div class="modal-card">
+            <h3>⚠️ Ceza Ekle</h3>
+            <p id="custom-penalty-desc"></p>
+            <input type="number" id="custom-penalty-input" inputmode="numeric" placeholder="Ceza puanı (Örn: 50)">
+            <div class="modal-actions">
+                <button class="btn-outline" onclick="closeCustomPenaltyModal()">İptal</button>
+                <button class="btn-danger" onclick="confirmCustomPenalty()">Ekle</button>
+            </div>
+        </div>
+    </div>
     <script src="script.js"></script>
     <script>
         if ('serviceWorker' in navigator) {

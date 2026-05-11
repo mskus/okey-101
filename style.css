@@ -1979,3 +1979,23 @@ body.light-theme .footer-pill {
 body.light-theme .room-item-footer {
     border-top-color: rgba(15, 23, 42, 0.08);
 }
+
+/* ============================================
+   ESKİ ANDROID CİHAZLAR İÇİN FLEXBOX GAP DÜZELTMESİ (FALLBACK)
+   Chrome 84 öncesi WebView'lar gap komutunu okuyamadığı için iç içe geçmeyi önler.
+   ============================================ */
+.penalty-actions-row > *:not(:last-child) {
+    margin-right: 8px;
+}
+.header-actions > *:not(:last-child) {
+    margin-right: 8px;
+}
+.modal-actions > *:not(:last-child) {
+    margin-right: 10px;
+}
+.fast-select-group > * {
+    margin: 4px;
+}
+.drawer-bar-btn:not(:last-child) {
+    margin-right: 8px;
+}
