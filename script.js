@@ -85,10 +85,33 @@ function setUserName(name) {
 function showToast(message, type = 'info') {
     const container = $('#toast-container');
     if (!container) return;
+
+    // --- Sound effects (non-blocking, fails silently if autoplay blocked) ---
+    const TOAST_SOUNDS = {
+        success: 'https://cdn.freesound.org/previews/256/256113_3263906-lq.mp3', // soft ding
+        error:   'https://cdn.freesound.org/previews/362/362204_6750864-lq.mp3', // short buzz
+        warning: 'https://cdn.freesound.org/previews/414/414209_5121236-lq.mp3', // gentle alert
+        info:    'https://cdn.freesound.org/previews/399/399934_1409058-lq.mp3', // neutral pop
+    };
+
+    if (localStorage.getItem(MUTE_STORAGE_KEY) !== '1') {
+        const soundUrl = TOAST_SOUNDS[type] || TOAST_SOUNDS.info;
+        try {
+            const sfx = new Audio(soundUrl);
+            sfx.volume = 0.45;
+            sfx.play().catch(() => {});
+        } catch (_) {}
+    }
+
+    // --- Build toast element ---
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
-    toast.innerHTML = `<span>${icons[type] || 'ℹ️'}</span><span>${message}</span>`;
+    toast.innerHTML = `
+        <span>${icons[type] || 'ℹ️'}</span>
+        <span>${message}</span>
+        <div class="toast-progress"></div>
+    `;
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
 }
