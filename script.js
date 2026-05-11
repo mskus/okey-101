@@ -847,7 +847,6 @@ window.addPenalty = function(idx, amt, reason) {
     showUndoToast(`${getPlayerName(idx)}: +${amt} ceza eklendi`, 'warning');
 };
 
-window.askCustomPenalty = function(idx) {
 let pendingPenaltyPlayerIdx = null;
 
 window.askCustomPenalty = function(idx) {
@@ -875,8 +874,6 @@ window.confirmCustomPenalty = function() {
     closeCustomPenaltyModal();
 };
 
-
-};
 
 /* ============================================
    SCORE EDIT / DELETE
@@ -1726,12 +1723,6 @@ window.closeInviteModal = function () {
     if (modal) modal.classList.remove('active');
 };
 
-window.copyInviteUrlFromModal = function () {
-    if (!currentRoomId) return;
-    const url = window.location.origin + window.location.pathname + '?room=' + currentRoomId;
-    copyToClipboard(url);
-};
-
 window.sendChatMessage = function () {
     if (!currentRoomId) return;
     const input = $('#game-chat-input');
@@ -1819,7 +1810,5 @@ window.setWinType = setWinType;
 window.toggleState = toggleState;
 window.toggleTheme = toggleTheme;
 window.toggleMute = toggleMute;
-window.closeCustomPenaltyModal = closeCustomPenaltyModal;
-window.confirmCustomPenalty = confirmCustomPenalty;
 
 init();
