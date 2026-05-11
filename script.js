@@ -251,6 +251,59 @@ let pendingDeleteRoomId = null;
 let pendingAdisyonItemId = null;
 let prevTotals = [0, 0, 0, 0];
 let newHistoryIds = new Set();
+let lobbyListRef = null;
+let roomChatRef = null;
+
+const ROOM_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function detachLobbyList() {
+    if (lobbyListRef) {
+        lobbyListRef.off();
+        lobbyListRef = null;
+    }
+}
+
+function detachChat() {
+    if (roomChatRef) {
+        roomChatRef.off();
+        roomChatRef = null;
+    }
+}
+
+function updateChatUI(snap) {
+    const box = $('#game-chat-messages');
+    if (!box) return;
+    const val = snap.val();
+    if (!val) {
+        box.innerHTML = '<div class="chat-empty">Henüz mesaj yok.</div>';
+        return;
+    }
+    const entries = Object.entries(val).sort((a, b) => a[0].localeCompare(b[0]));
+    box.innerHTML = entries
+        .map(([, m]) => {
+            const from = escapeHtml(m.from || '?');
+            const text = escapeHtml(m.text || '');
+            return `<div class="chat-msg"><span class="chat-author">${from}</span><span class="chat-text">${text}</span></div>`;
+        })
+        .join('');
+    box.scrollTop = box.scrollHeight;
+}
+
+function attachChat(roomId) {
+    detachChat();
+    if (!roomId) return;
+    roomChatRef = db.ref('lobiler/' + roomId + '/chat');
+    roomChatRef.orderByKey().limitToLast(20).on('value', updateChatUI);
+}
 
 let uiState = { showScoreboard: false, showCalc: false, showAdisyon: false, calcValue: "" };
 
@@ -347,6 +400,9 @@ function createRoom() {
     }
 
     const roomId = generateId();
+    const initialState = getDefaultState();
+    initialState.players[0] = currentUser;
+
     const roomData = {
         meta: {
             name: name,
@@ -354,7 +410,7 @@ function createRoom() {
             createdAt: Date.now(),
             createdBy: currentUser
         },
-        state: getDefaultState()
+        state: initialState
     };
 
     db.ref('lobiler/' + roomId).set(roomData)
@@ -368,6 +424,7 @@ function createRoom() {
 }
 
 function enterRoom(roomId) {
+    detachLobbyList();
     currentRoomId = roomId;
     roomRef = db.ref('lobiler/' + roomId + '/state');
     attachRoomPresence(roomId);
@@ -399,6 +456,7 @@ function leaveRoom() {
         roomRef = null;
     }
     detachRoomPresence();
+    detachChat();
     currentRoomId = null;
     isDataLoaded = false;
     if (timerInterval) {
@@ -952,12 +1010,12 @@ function renderLobby() {
     const app = $('#app');
 
     app.innerHTML = `
-        <div class="lobby-header screen-enter">
-            <div class="lobby-header-top">
-                <div class="logo">🎲</div>
-                <div class="lobby-header-actions">${headerThemeMuteButtonsHTML()}</div>
+<div class="lobby-header screen-enter">
+            <div class="header-content-wrapper">
+                <img src="logo.png" alt="101 Matik" class="header-logo-img">
+                <h1>101 MATİK</h1>
             </div>
-            <h1>101 OKEY PRO</h1>
+        </div>
         </div>
 
         <div class="card screen-enter" style="animation-delay:0.05s">
@@ -966,11 +1024,7 @@ function renderLobby() {
                     👤 <input type="text" id="user-name-input" value="${currentUser}" 
                         onchange="saveUserName(this.value)" onclick="event.stopPropagation()">
                 </div>
-                <p style="font-size:12px; color:var(--text-muted);">İsminizi değiştirmek için üzerine tıklayın</p>
-            </div>
 
-            <div class="lobby-info-text">
-                🎮 Masa kur, arkadaşlarını davet et, skorları takip et. Adisyonu ekle, oyunu daha keyifli hale getir!
             </div>
 
             <h3>🆕 Yeni Masa Kur</h3>
@@ -981,21 +1035,39 @@ function renderLobby() {
             </div>
         </div>
 
-        <div class="card screen-enter" style="animation-delay:0.15s">
-            <h3>🚪 Aktif Masalar</h3>
+        <div class="card lobby-rooms-card screen-enter" style="animation-delay:0.15s">
+            <div class="lobby-rooms-head">
+                <div class="lobby-rooms-head-left">
+                    <span class="live-dot live-dot--pulse-red" aria-hidden="true"></span>
+                    <h3 class="lobby-rooms-title">Aktif Masalar</h3>
+                </div>
+                <span class="lobby-sync-label">Canlı Senkronize</span>
+            </div>
             <div id="room-list" class="room-list">
                 <div class="loading-screen" style="min-height:auto; padding:30px;">
                     <div class="spinner" style="width:30px; height:30px; border-width:3px;"></div>
                     <p style="font-size:13px;">Masalar yükleniyor...</p>
                 </div>
             </div>
+            <div class="lobby-sponsor-premium" aria-label="Sponsor alanı">
+                <div class="lobby-sponsor-premium-inner">
+                    <div class="lobby-sponsor-premium-content">
+                        <span class="lobby-sponsor-star" aria-hidden="true">✦</span>
+                        <span class="lobby-sponsor-text">Sponsorlu İçerik Alanı</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="footer-info">
-            <div class="footer-badge">🟢 <span id="active-users-label">Çevrimiçi</span>: <strong id="active-users-count" style="color:var(--success);">${activeUsersGlobal}</strong></div>
-            <div class="footer-badge">${deviceType}</div>
-            <div class="footer-badge">IP: <strong>${clientIP}</strong></div>
-        </div>
+        <footer class="footer-bar">
+            <div class="footer-pill footer-pill--online">
+                <span class="live-dot live-dot--pulse-green" aria-hidden="true"></span>
+                <span id="active-users-label" class="footer-pill-label">Çevrimiçi</span>
+                <strong id="active-users-count" class="footer-pill-value">${activeUsersGlobal}</strong>
+            </div>
+            <div class="footer-pill">${deviceType}</div>
+            <div class="footer-pill">IP: <strong class="footer-pill-mono">${clientIP}</strong></div>
+        </footer>
     `;
 
     loadRoomList();
@@ -1020,10 +1092,17 @@ function loadRoomList() {
     const listEl = $('#room-list');
     if (!listEl) return;
 
-    db.ref('lobiler').on('value', snap => {
+    if (lobbyListRef) lobbyListRef.off();
+    lobbyListRef = db.ref('lobiler');
+    lobbyListRef.on('value', snap => {
+        const listElNow = $('#room-list');
+        if (!listElNow) return;
+
         const rooms = snap.val();
+        const now = Date.now();
+
         if (!rooms || Object.keys(rooms).length === 0) {
-            listEl.innerHTML = `
+            listElNow.innerHTML = `
                 <div class="empty-rooms">
                     <span class="emoji">🍃</span>
                     <p>Henüz açık masa yok.<br>İlk masayı siz kurun!</p>
@@ -1032,31 +1111,60 @@ function loadRoomList() {
             return;
         }
 
-        const roomArray = Object.entries(rooms).map(([id, data]) => ({ id, ...data }));
+        Object.entries(rooms).forEach(([id, data]) => {
+            const created = data?.meta?.createdAt;
+            if (created && now - created > ROOM_MAX_AGE_MS) {
+                db.ref('lobiler/' + id).remove().catch(() => {});
+            }
+        });
+
+        const roomArray = Object.entries(rooms)
+            .filter(([, data]) => {
+                const created = data?.meta?.createdAt;
+                return !(created && now - created > ROOM_MAX_AGE_MS);
+            })
+            .map(([id, data]) => ({ id, ...data }));
         roomArray.sort((a, b) => (b.meta?.createdAt || 0) - (a.meta?.createdAt || 0));
 
-        listEl.innerHTML = roomArray.map((room, idx) => {
+        if (roomArray.length === 0) {
+            listElNow.innerHTML = `
+                <div class="empty-rooms">
+                    <span class="emoji">🍃</span>
+                    <p>Henüz açık masa yok.<br>İlk masayı siz kurun!</p>
+                </div>
+            `;
+            return;
+        }
+
+        listElNow.innerHTML = roomArray.map((room, idx) => {
             const hasPass = room.meta && room.meta.password;
             const onlineCount = room.onlineUsers ? Object.keys(room.onlineUsers).length : 0;
             const isOwner = room.meta && room.meta.createdBy === currentUser;
+            const roomName = escapeHtml(room.meta?.name || 'İsimsiz Masa');
+            const creator = escapeHtml(room.meta?.createdBy || 'Bilinmiyor');
+            const timeStr = new Date(room.meta?.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+            const deleteBtn = isOwner
+                ? `<button type="button" class="btn-room-action btn-room-action--delete" onclick="event.stopPropagation(); deleteRoom('${room.id}')" title="Masayı sil">🗑️</button>`
+                : '';
 
             return `
-                <div class="room-item" style="animation: cardEnter 0.4s ease-out both ${idx * 0.05}s;" 
-                     onclick="joinRoom('${room.id}', ${hasPass ? 'true' : 'false'})">
-                    <div class="room-item-info">
-                        <h4>
-                            ${room.meta?.name || 'İsimsiz Masa'}
-                            ${hasPass ? '<span class="room-lock">🔒</span>' : ''}
-                        </h4>
-                        <span>Kurucu: ${room.meta?.createdBy || 'Bilinmiyor'} • ${new Date(room.meta?.createdAt).toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'})}</span>
+<article class="room-item" style="cursor: pointer; animation: cardEnter 0.4s ease-out both ${idx * 0.05}s;" onclick="joinRoom('${room.id}', ${hasPass ? 'true' : 'false'})">
+                    <div class="room-item-details">
+                        <h4 class="room-item-name">${roomName}${hasPass ? ' <span class="room-lock" aria-label="Şifreli">🔒</span>' : ''}</h4>
+                        <span class="room-item-creator">Kurucu: ${creator}</span>
+                        <time class="room-item-time" datetime="${room.meta?.createdAt || ''}">${timeStr}</time>
                     </div>
-                    <div class="room-item-meta">
-                        <div class="room-count">
-                            👥 ${onlineCount}
+                    <div class="room-item-footer">
+                        <div class="room-item-online" title="Masada çevrimiçi">
+                            <span class="room-item-online-icon" aria-hidden="true">👥</span>
+                            <span class="room-item-online-count">${onlineCount}</span>
                         </div>
-                        ${isOwner ? `<button class="btn-danger btn-small" style="width:auto; padding:6px 10px; font-size:12px;" onclick="event.stopPropagation(); deleteRoom('${room.id}')">🗑️</button>` : ''}
+<div class="room-item-actions">
+                            ${deleteBtn}
+                            <div class="btn-room-action btn-room-action--join" style="pointer-events: none;">Katıl</div>
+                        </div>
                     </div>
-                </div>
+                </article>
             `;
         }).join('');
     });
@@ -1075,11 +1183,15 @@ window.render = function() {
     const roomName = state.roomName || 'Masa';
 
     const footerHTML = `
-        <div class="footer-info">
-            <div class="footer-badge">🟢 <span id="active-users-label">Bu Masada</span>: <strong id="active-users-count" style="color:var(--success);">${activeUsersRoom}</strong></div>
-            <div class="footer-badge">${deviceType}</div>
-            <div class="footer-badge">IP: <strong>${clientIP}</strong></div>
-        </div>
+        <footer class="footer-bar">
+            <div class="footer-pill footer-pill--online">
+                <span class="live-dot live-dot--pulse-green" aria-hidden="true"></span>
+                <span id="active-users-label" class="footer-pill-label">Bu Masada</span>
+                <strong id="active-users-count" class="footer-pill-value">${activeUsersRoom}</strong>
+            </div>
+            <div class="footer-pill">${deviceType}</div>
+            <div class="footer-pill">IP: <strong class="footer-pill-mono">${clientIP}</strong></div>
+        </footer>
     `;
 
     if (state.screen === 'setup') {
@@ -1173,14 +1285,22 @@ window.render = function() {
         const prevBTotal = prevTotals[2] + prevTotals[3];
         const flashTeamA = teamATotal !== prevATotal ? 'score-flash' : '';
         const flashTeamB = teamBTotal !== prevBTotal ? 'score-flash' : '';
-        const mvpTotal = Math.min(...state.totals);
+        const diffTeams = Math.abs(teamATotal - teamBTotal);
+        const teamAWinsScore = teamATotal < teamBTotal;
+        const teamBWinsScore = teamBTotal < teamATotal;
+        const tieTeams = teamATotal === teamBTotal;
+
+        let mvpIdx = 0;
+        for (let j = 1; j < 4; j++) {
+            if (state.totals[j] < state.totals[mvpIdx]) mvpIdx = j;
+        }
 
         const playerCards = [0, 1, 2, 3].map((i) => {
             const s = getStats(i);
             const teamClass = i < 2 ? 'sb-player-team-a' : 'sb-player-team-b';
             const flash = state.totals[i] !== prevTotals[i] ? 'score-flash' : '';
-            const isMvp = state.totals[i] === mvpTotal;
-            const diffFromMvp = state.totals[i] - mvpTotal;
+            const isMvp = i === mvpIdx;
+            const diffFromMvp = state.totals[i] - state.totals[mvpIdx];
             const name = getPlayerName(i);
             const shortName = name.length > 14 ? name.substring(0, 14) + '…' : name;
             return `
@@ -1197,32 +1317,44 @@ window.render = function() {
             </article>`;
         }).join('');
 
+        const diffBanner = tieTeams
+            ? `<div class="scoreboard-team-diff-banner is-tie"><span>Takım skoru berabere</span></div>`
+            : `<div class="scoreboard-team-diff-banner">
+                <span class="scoreboard-fark-value">Fark: +${diffTeams}</span>
+                <span class="scoreboard-fark-lead">🏆 ${teamAWinsScore ? '1. Takım' : '2. Takım'} önde</span>
+            </div>`;
+
         scoreboardHTML = `
             <div class="scoreboard-team-shell">
                 <div class="scoreboard-team-summary">
-                    <div class="scoreboard-team-pill scoreboard-team-pill-a ${flashTeamA}">
-                        <span class="scoreboard-team-pill-label">1. Takım</span>
-                        <span class="scoreboard-team-pill-total">${teamATotal}</span>
+                    <div class="scoreboard-team-pill scoreboard-team-pill-a">
+                        <span class="scoreboard-team-pill-label">1. Takım${teamAWinsScore ? ' 🏆' : ''}</span>
+                        <span class="scoreboard-team-pill-total ${flashTeamA}">${teamATotal}</span>
                     </div>
-                    <div class="scoreboard-team-pill scoreboard-team-pill-b ${flashTeamB}">
-                        <span class="scoreboard-team-pill-label">2. Takım</span>
-                        <span class="scoreboard-team-pill-total">${teamBTotal}</span>
+                    <div class="scoreboard-team-pill scoreboard-team-pill-b">
+                        <span class="scoreboard-team-pill-label">2. Takım${teamBWinsScore ? ' 🏆' : ''}</span>
+                        <span class="scoreboard-team-pill-total ${flashTeamB}">${teamBTotal}</span>
                     </div>
                 </div>
+                ${diffBanner}
                 <div class="scoreboard-players-grid">
                     ${playerCards}
                 </div>
             </div>`;
     } else {
-        const leaderMin = Math.min(...state.totals);
+        let mvpIdxSingle = 0;
+        for (let j = 1; j < 4; j++) {
+            if (state.totals[j] < state.totals[mvpIdxSingle]) mvpIdxSingle = j;
+        }
+        const leaderMin = state.totals[mvpIdxSingle];
         scoreboardHTML = [0,1,2,3].map(i => {
             let s = getStats(i);
             const flash = state.totals[i] !== prevTotals[i] ? 'score-flash' : '';
-            const isMvp = state.totals[i] === leaderMin;
-            const diff = state.totals[i] > leaderMin ? state.totals[i] - leaderMin : null;
+            const isMvp = i === mvpIdxSingle;
+            const diff = state.totals[i] - leaderMin;
             return `<div class="score-box">
                 <h4>${getPlayerName(i).substring(0,8)}${isMvp ? ' 👑 MVP' : ''}</h4><div class="total ${flash}">${state.totals[i]}</div>
-                <div class="stat-detail" style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">Biten: ${s.wins}<br>Toplam Ceza: ${s.pens}${diff != null ? `<br>Liderden Fark: +${diff}` : ''}</div>
+                <div class="stat-detail" style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">Biten: ${s.wins}<br>Toplam Ceza: ${s.pens}${diff === 0 ? '<br>MVP ile aynı' : `<br>MVP farkı: +${diff}`}</div>
             </div>`;
         }).join('');
     }
@@ -1243,9 +1375,12 @@ window.render = function() {
     }).join('');
 
     app.innerHTML = `
-        <div class="game-header screen-enter">
-            <div>
-                <h2>🎯 ${roomName}</h2>
+<div class="game-header screen-enter">
+            <div class="game-title-wrapper">
+                <img src="logo.png" class="game-logo-img">
+                <div>
+                    <h2>101 Matik  | ${roomName}</h2>
+                </div>
             </div>
             <div class="header-actions">
                 ${headerThemeMuteButtonsHTML()}
@@ -1262,11 +1397,11 @@ window.render = function() {
                         <h4 class="${state.mode==='team'?(i<2?'text-team-a':'text-team-b'):''}">${getPlayerName(i).substring(0,12)}</h4>
 
                         <input type="number" id="score-input-${i}" placeholder="202" value="${state.currentRound[`p${i}`].score}" oninput="state.currentRound['p${i}'].score = this.value;" onblur="saveState()">
- <div class="col">
-                        <div class="penalty-actions penalty-actions-stack">
-                            <button class="btn-toggle ${state.currentRound[`p${i}`].double ? 'active' : ''}" onclick="toggleState(${i}, 'double')">Çift</button>
-                            <button class="btn-outline btn-winner btn-small" onclick="askCustomPenalty(${i})">Ceza</button>
-                        </div></div>
+
+                        <div class="penalty-actions penalty-actions-row">
+                            <button type="button" class="btn-toggle ${state.currentRound[`p${i}`].double ? 'active' : ''}" onclick="toggleState(${i}, 'double')">Çift</button>
+                            <button type="button" class="btn-danger btn-small btn-penalty-inline" onclick="askCustomPenalty(${i})">Ceza</button>
+                        </div>
                     </div>`).join('')}
             </div>
         </div>
@@ -1306,6 +1441,26 @@ window.render = function() {
                 </table>
             </div>
             <button class="btn-danger" style="margin-top: 15px;" onclick="finishAndArchive()">MAÇI BİTİR</button>
+        </div>
+
+        <div class="game-chat-panel card screen-enter" style="animation-delay:0.22s; margin-bottom:16px;">
+            <div class="game-chat-header">💬 Sohbet</div>
+            <div id="game-chat-messages" class="game-chat-messages" aria-live="polite"></div>
+
+            <div class="game-chat-form">
+                <input type="text" id="game-chat-input" maxlength="500" placeholder="Mesaj yazın…" autocomplete="off">
+                <button type="button" class="btn-primary btn-chat-send" onclick="sendChatMessage()">Gönder</button>
+
+                
+            </div>
+                        <div class="lobby-sponsor-premium" aria-label="Sponsor alanı">
+                <div class="lobby-sponsor-premium-inner">
+                    <div class="lobby-sponsor-premium-content">
+                        <span class="lobby-sponsor-star" aria-hidden="true">✦</span>
+                        <span class="lobby-sponsor-text">Sponsorlu İçerik Alanı</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         ${footerHTML}
@@ -1353,6 +1508,21 @@ window.render = function() {
     updateLiveTimer();
     renderAdisyon();
     prevTotals = [...state.totals];
+
+    if (currentRoomId && state.screen === 'game') {
+        attachChat(currentRoomId);
+        const chatInput = $('#game-chat-input');
+        if (chatInput) {
+            chatInput.onkeydown = function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    sendChatMessage();
+                }
+            };
+        }
+    } else {
+        detachChat();
+    }
 };
 
 /* ============================================
@@ -1361,7 +1531,61 @@ window.render = function() {
 window.copyRoomLink = function() {
     if (!currentRoomId) return;
     const url = window.location.origin + window.location.pathname + '?room=' + currentRoomId;
+    const modal = $('#invite-modal');
+    const urlEl = $('#invite-url-text');
+    const qrHost = $('#invite-qr-host');
+    if (urlEl) urlEl.textContent = url;
+    if (qrHost) {
+        qrHost.innerHTML = '';
+        const imgQr = () => {
+            qrHost.innerHTML = `<img class="invite-qr-img" width="200" height="200" alt="Davet QR" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}">`;
+        };
+        if (typeof QRCode !== 'undefined') {
+            try {
+                new QRCode(qrHost, url);
+                const img = qrHost.querySelector('img');
+                if (img) {
+                    img.width = 200;
+                    img.height = 200;
+                    img.className = 'invite-qr-img';
+                    img.alt = 'Davet QR';
+                }
+            } catch (e) {
+                imgQr();
+            }
+        } else {
+            imgQr();
+        }
+    }
+    if (modal) modal.classList.add('active');
+};
+
+window.closeInviteModal = function () {
+    const modal = $('#invite-modal');
+    if (modal) modal.classList.remove('active');
+};
+
+window.copyInviteUrlFromModal = function () {
+    if (!currentRoomId) return;
+    const url = window.location.origin + window.location.pathname + '?room=' + currentRoomId;
     copyToClipboard(url);
+};
+
+window.sendChatMessage = function () {
+    if (!currentRoomId) return;
+    const input = $('#game-chat-input');
+    const text = input ? input.value.trim() : '';
+    if (!text) return;
+    db.ref('lobiler/' + currentRoomId + '/chat')
+        .push({
+            from: currentUser,
+            text: text.slice(0, 500),
+            ts: Date.now()
+        })
+        .then(() => {
+            if (input) input.value = '';
+        })
+        .catch((err) => showToast('Mesaj gönderilemedi: ' + err.message, 'error'));
 };
 
 /* ============================================

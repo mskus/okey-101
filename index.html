@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#8b5cf6">
     <meta name="description" content="101 Okey canlı masa, skor ve adisyon takibi.">
-    <title>101 Okey Pro — Canlı Çoklu Masa</title>
+    <title>101 Matik — Canlı Çoklu Masa</title>
+    <link rel="icon" type="image/png" href="icon.png">
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
@@ -24,6 +25,20 @@
     </div>
 
     <div id="toast-container"></div>
+
+    <!-- Room invite (link + QR) -->
+    <div id="invite-modal" class="modal-overlay" onclick="if(event.target===this)closeInviteModal()">
+        <div class="modal-card invite-modal-card" onclick="event.stopPropagation()">
+            <h3>🔗 Masa daveti</h3>
+            <p class="invite-hint">Linki paylaşın veya QR kodu telefonla taratın.</p>
+            <div id="invite-qr-host" class="invite-qr-host"></div>
+            <pre id="invite-url-text" class="invite-url-text"></pre>
+            <div class="modal-actions">
+                <button type="button" class="btn-primary" onclick="copyInviteUrlFromModal()">Kopyala</button>
+                <button type="button" class="btn-outline" onclick="closeInviteModal()">Kapat</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Edit Score Modal -->
     <div id="edit-modal" class="modal-overlay">
@@ -98,6 +113,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="script.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
