@@ -1262,11 +1262,11 @@ window.render = function() {
                         <h4 class="${state.mode==='team'?(i<2?'text-team-a':'text-team-b'):''}">${getPlayerName(i).substring(0,12)}</h4>
 
                         <input type="number" id="score-input-${i}" placeholder="202" value="${state.currentRound[`p${i}`].score}" oninput="state.currentRound['p${i}'].score = this.value;" onblur="saveState()">
-
+ <div class="col">
                         <div class="penalty-actions penalty-actions-stack">
                             <button class="btn-toggle ${state.currentRound[`p${i}`].double ? 'active' : ''}" onclick="toggleState(${i}, 'double')">Çift</button>
-                            <button class="btn-outline btn-small" onclick="askCustomPenalty(${i})">Ceza</button>
-                        </div>
+                            <button class="btn-outline btn-winner btn-small" onclick="askCustomPenalty(${i})">Ceza</button>
+                        </div></div>
                     </div>`).join('')}
             </div>
         </div>
