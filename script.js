@@ -93,6 +93,107 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 3000);
 }
 
+function deepCloneState(src) {
+    return JSON.parse(JSON.stringify(src));
+}
+
+function clearUndoToastTimer() {
+    if (undoToastTimer) {
+        clearTimeout(undoToastTimer);
+        undoToastTimer = null;
+    }
+}
+
+function showUndoToast(message, type = 'warning') {
+    const container = $('#toast-container');
+    if (!container) return;
+    clearUndoToastTimer();
+    const toast = document.createElement('div');
+    toast.className = `toast toast-undo ${type}`;
+    const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+    toast.innerHTML = `
+        <span>${icons[type] || 'ℹ️'}</span>
+        <span class="toast-undo-msg">${message}</span>
+        <button type="button" class="btn-undo-toast" onclick="performUndo()">Geri Al</button>
+    `;
+    container.appendChild(toast);
+    undoToastTimer = setTimeout(() => {
+        toast.remove();
+        undoToastTimer = null;
+    }, 5000);
+}
+
+window.performUndo = function() {
+    if (!previousState || !roomRef) return;
+    clearUndoToastTimer();
+    const t = document.querySelector('.toast.toast-undo');
+    if (t) t.remove();
+    state = deepCloneState(previousState);
+    previousState = null;
+    saveState();
+    render();
+    showToast('İşlem geri alındı.', 'info');
+};
+
+/* ============================================
+   THEME & AUDIO
+   ============================================ */
+const THEME_STORAGE_KEY = 'okey_theme';
+const MUTE_STORAGE_KEY = 'okey_muted';
+
+function applySavedTheme() {
+    const light = localStorage.getItem(THEME_STORAGE_KEY) === 'light';
+    document.body.classList.toggle('light-theme', light);
+}
+
+function getThemeToggleIcon() {
+    return document.body.classList.contains('light-theme') ? '🌙' : '☀️';
+}
+
+window.toggleTheme = function() {
+    const next = document.body.classList.toggle('light-theme');
+    localStorage.setItem(THEME_STORAGE_KEY, next ? 'light' : 'dark');
+    if (currentRoomId) render();
+    else renderLobby();
+};
+
+const audioManager = {
+    urls: {
+        join_room: 'https://www.soundjay.com/buttons/sounds/button-09.mp3',
+        add_penalty: 'https://www.soundjay.com/buttons/sounds/button-10.mp3',
+        round_end: 'https://www.soundjay.com/buttons/sounds/button-21.mp3'
+    },
+    play(key) {
+        if (localStorage.getItem(MUTE_STORAGE_KEY) === '1') return;
+        const url = this.urls[key];
+        if (!url) return;
+        try {
+            const a = new Audio(url);
+            a.volume = 0.35;
+            a.play().catch(() => {});
+        } catch (e) {}
+    }
+};
+
+function isAudioMuted() {
+    return localStorage.getItem(MUTE_STORAGE_KEY) === '1';
+}
+
+window.toggleMute = function() {
+    localStorage.setItem(MUTE_STORAGE_KEY, isAudioMuted() ? '0' : '1');
+    if (currentRoomId) render();
+    else renderLobby();
+};
+
+function getMuteToggleIcon() {
+    return isAudioMuted() ? '🔇' : '🔊';
+}
+
+function headerThemeMuteButtonsHTML() {
+    return `<button type="button" class="btn-outline btn-icon" onclick="toggleTheme()" title="Gündüz / Gece">${getThemeToggleIcon()}</button>
+                <button type="button" class="btn-outline btn-icon" onclick="toggleMute()" title="Ses">${getMuteToggleIcon()}</button>`;
+}
+
 function copyToClipboard(text) {
     const onSuccess = () => showToast('Kopyalandı!', 'success');
     if (navigator.clipboard) {
@@ -152,6 +253,10 @@ let prevTotals = [0, 0, 0, 0];
 let newHistoryIds = new Set();
 
 let uiState = { showScoreboard: false, showCalc: false, showAdisyon: false, calcValue: "" };
+
+/** Deep-cloned snapshot for Undo (addPenalty / calculateRound). */
+let previousState = null;
+let undoToastTimer = null;
 
 function getInitialRound() {
     return {
@@ -266,6 +371,7 @@ function enterRoom(roomId) {
     currentRoomId = roomId;
     roomRef = db.ref('lobiler/' + roomId + '/state');
     attachRoomPresence(roomId);
+    audioManager.play('join_room');
 
     roomRef.on('value', (snapshot) => {
         const data = snapshot.val();
@@ -302,6 +408,7 @@ function leaveRoom() {
     state = getDefaultState();
     uiState = { showScoreboard: false, showCalc: false, showAdisyon: false, calcValue: "" };
     prevTotals = [0, 0, 0, 0];
+    pendingJoinRoomId = null;
     renderLobby();
     showToast('Lobiye döndünüz.', 'info');
 }
@@ -325,10 +432,11 @@ function confirmJoinWithPassword() {
     }
     db.ref('lobiler/' + pendingJoinRoomId + '/meta/password').once('value')
         .then(snap => {
-            if (snap.val() === pass) {
+            const stored = snap.val();
+            const roomId = pendingJoinRoomId;
+            if (String(stored) === String(pass)) {
                 closePasswordModal();
-                enterRoom(pendingJoinRoomId);
-                pendingJoinRoomId = null;
+                if (roomId) enterRoom(roomId);
             } else {
                 showToast('Yanlış şifre!', 'error');
             }
@@ -363,10 +471,11 @@ function confirmDeleteWithPassword() {
     }
     db.ref('lobiler/' + pendingDeleteRoomId + '/meta/password').once('value')
         .then(snap => {
-            if (snap.val() === pass) {
+            const stored = snap.val();
+            const roomId = pendingDeleteRoomId;
+            if (String(stored) === String(pass)) {
                 closeDeleteModal();
-                performDelete(pendingDeleteRoomId);
-                pendingDeleteRoomId = null;
+                if (roomId) performDelete(roomId);
             } else {
                 showToast('Yanlış şifre!', 'error');
             }
@@ -412,21 +521,9 @@ function getArchiveTeamName(archObj, teamIdx) {
 /* ============================================
    SCORE INPUT HANDLERS
    ============================================ */
-window.handleScoreInput = function(idx, value) { 
-    state.currentRound[`p${idx}`].score = value; 
-    saveState(); 
-};
 window.toggleState = function(idx, field) { 
     state.currentRound[`p${idx}`][field] = !state.currentRound[`p${idx}`][field]; 
     saveState(); 
-};
-
-window.handleQuickPenalty = function(idx, selectEl) {
-    let val = parseInt(selectEl.value);
-    if (!isNaN(val)) { 
-        addPenalty(idx, val, `+${val}`); 
-        selectEl.value = ""; 
-    }
 };
 
 window.setMode = function(mode) { state.mode = mode; saveState(); }
@@ -509,6 +606,8 @@ function updateLiveTimer() {
    ROUND CALCULATION
    ============================================ */
 window.calculateRound = function() {
+    previousState = deepCloneState(state);
+
     let winnerIdx = parseInt(state.currentRound.winner);
     let winType = state.currentRound.winType;
     let roundScores = [0, 0, 0, 0];
@@ -556,10 +655,13 @@ window.calculateRound = function() {
 
     state.currentRound = getInitialRound();
     saveState();
-    showToast('El hesaplandı!', 'success');
+    audioManager.play('round_end');
+    showUndoToast('El hesaplandı!', 'success');
 };
 
 window.addPenalty = function(idx, amt, reason) {
+    previousState = deepCloneState(state);
+
     state.totals[idx] += amt;
     if (!state.history) state.history = [];
     const entryId = generateId();
@@ -573,12 +675,17 @@ window.addPenalty = function(idx, amt, reason) {
     newHistoryIds.add(entryId);
     setTimeout(() => newHistoryIds.delete(entryId), 1200);
     saveState();
-    showToast(`${getPlayerName(idx)}: ${amt} ceza eklendi`, 'warning');
+    audioManager.play('add_penalty');
+    showUndoToast(`${getPlayerName(idx)}: +${amt} ceza eklendi`, 'warning');
 };
 
 window.askCustomPenalty = function(idx) {
-    let amt = prompt(`${getPlayerName(idx)} için özel ceza puanı (Örn: 50):`);
-    if (amt && !isNaN(amt)) addPenalty(idx, parseInt(amt), 'Ceza');
+    const raw = prompt(`${getPlayerName(idx)} için özel ceza puanı (Örn: 50):`);
+    if (raw == null) return;
+    const amt = String(raw).trim();
+    if (amt !== '' && !isNaN(amt)) {
+        addPenalty(idx, parseInt(amt, 10), 'Ceza');
+    }
 };
 
 /* ============================================
@@ -817,7 +924,10 @@ function renderLobby() {
 
     app.innerHTML = `
         <div class="lobby-header screen-enter">
-            <div class="logo">🎲</div>
+            <div class="lobby-header-top">
+                <div class="logo">🎲</div>
+                <div class="lobby-header-actions">${headerThemeMuteButtonsHTML()}</div>
+            </div>
             <h1>101 OKEY PRO</h1>
         </div>
 
@@ -951,6 +1061,7 @@ window.render = function() {
                     <div class="room-name">${roomName}</div>
                 </div>
                 <div class="header-actions">
+                    ${headerThemeMuteButtonsHTML()}
                     <button class="btn-outline btn-icon" onclick="copyRoomLink()">🔗</button>
                     <button class="btn-danger btn-icon" onclick="leaveRoom()">🚪 Çık</button>
                 </div>
@@ -1016,6 +1127,11 @@ window.render = function() {
         let sB = getStats(2, 3);
         const teamATotal = state.totals[0]+state.totals[1];
         const teamBTotal = state.totals[2]+state.totals[3];
+        const leaderMin = Math.min(teamATotal, teamBTotal);
+        const mvpA = teamATotal === leaderMin;
+        const mvpB = teamBTotal === leaderMin;
+        const diffA = teamATotal > leaderMin ? teamATotal - leaderMin : null;
+        const diffB = teamBTotal > leaderMin ? teamBTotal - leaderMin : null;
         const prevATotal = prevTotals[0]+prevTotals[1];
         const prevBTotal = prevTotals[2]+prevTotals[3];
         const flashA = teamATotal !== prevATotal ? 'score-flash' : '';
@@ -1023,35 +1139,37 @@ window.render = function() {
 
         scoreboardHTML = `
             <div class="score-box bg-team-a" style="grid-column: span 2;">
-                <h4>${getTeamName(0)}</h4><div class="total ${flashA}">${teamATotal}</div>
+                <h4>${getTeamName(0)}${mvpA ? ' 👑 MVP' : ''}</h4><div class="total ${flashA}">${teamATotal}</div>
                 <div class="stat-detail" style="border-top:1px solid rgba(255,255,255,0.2); padding-top:8px; margin-top:8px;">
                     ${getPlayerName(0).substring(0,8)}: <strong>${state.totals[0]}</strong> | ${getPlayerName(1).substring(0,8)}: <strong>${state.totals[1]}</strong><br>
-                    Biten El: ${sA.wins} | Yenen Ceza: ${sA.pens}
+                    Biten El: ${sA.wins}<br>
+                    Toplam Ceza: ${sA.pens}${diffA != null ? `<br>Liderden Fark: +${diffA}` : ''}
                 </div>
             </div>
             <div class="score-box bg-team-b" style="grid-column: span 2;">
-                <h4>${getTeamName(2)}</h4><div class="total ${flashB}">${teamBTotal}</div>
+                <h4>${getTeamName(2)}${mvpB ? ' 👑 MVP' : ''}</h4><div class="total ${flashB}">${teamBTotal}</div>
                 <div class="stat-detail" style="border-top:1px solid rgba(255,255,255,0.2); padding-top:8px; margin-top:8px;">
                     ${getPlayerName(2).substring(0,8)}: <strong>${state.totals[2]}</strong> | ${getPlayerName(3).substring(0,8)}: <strong>${state.totals[3]}</strong><br>
-                    Biten El: ${sB.wins} | Yenen Ceza: ${sB.pens}
+                    Biten El: ${sB.wins}<br>
+                    Toplam Ceza: ${sB.pens}${diffB != null ? `<br>Liderden Fark: +${diffB}` : ''}
                 </div>
             </div>`;
     } else {
+        const leaderMin = Math.min(...state.totals);
         scoreboardHTML = [0,1,2,3].map(i => {
             let s = getStats(i);
             const flash = state.totals[i] !== prevTotals[i] ? 'score-flash' : '';
+            const isMvp = state.totals[i] === leaderMin;
+            const diff = state.totals[i] > leaderMin ? state.totals[i] - leaderMin : null;
             return `<div class="score-box">
-                <h4>${getPlayerName(i).substring(0,8)}</h4><div class="total ${flash}">${state.totals[i]}</div>
-                <div class="stat-detail" style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">Biten: ${s.wins} | Cz: ${s.pens}</div>
+                <h4>${getPlayerName(i).substring(0,8)}${isMvp ? ' 👑 MVP' : ''}</h4><div class="total ${flash}">${state.totals[i]}</div>
+                <div class="stat-detail" style="border-top:1px solid var(--border); padding-top:8px; margin-top:8px;">Biten: ${s.wins}<br>Toplam Ceza: ${s.pens}${diff != null ? `<br>Liderden Fark: +${diff}` : ''}</div>
             </div>`;
         }).join('');
     }
 
     let btnA = state.mode === 'team' ? 'bg-team-a-light text-team-a' : '';
     let btnB = state.mode === 'team' ? 'bg-team-b-light text-team-b' : '';
-
-    let penaltyOptions = `<option value="">+ Hızlı Ceza</option>`;
-    for(let v=10; v<=260; v+=10) penaltyOptions += `<option value="${v}">+${v} Ceza</option>`;
 
     const historyRows = (state.history || []).slice().reverse().map((h, revIdx) => {
         const realIdx = (state.history || []).length - 1 - revIdx;
@@ -1071,6 +1189,7 @@ window.render = function() {
                 <h2>🎯 ${roomName}</h2>
             </div>
             <div class="header-actions">
+                ${headerThemeMuteButtonsHTML()}
                 <span class="live-timer" id="live-timer">00:00</span>
                 <button class="btn-outline btn-icon" onclick="copyRoomLink()">🔗</button>
                 <button class="btn-danger btn-icon" onclick="leaveRoom()">🚪 Çık</button>
@@ -1083,17 +1202,10 @@ window.render = function() {
                     <div class="player-card ${state.mode==='team'?(i<2?'border-team-a':'border-team-b'):''}">
                         <h4 class="${state.mode==='team'?(i<2?'text-team-a':'text-team-b'):''}">${getPlayerName(i).substring(0,12)}</h4>
 
-                        <input type="number" id="score-input-${i}" placeholder="202" value="${state.currentRound[`p${i}`].score}" onchange="handleScoreInput(${i}, this.value)">
+                        <input type="number" id="score-input-${i}" placeholder="202" value="${state.currentRound[`p${i}`].score}" oninput="state.currentRound['p${i}'].score = this.value;" onblur="saveState()">
 
-                        <div class="penalty-actions">
-                            <select class="select-penalty" onchange="handleQuickPenalty(${i}, this)">
-                                ${penaltyOptions}
-                            </select>
-                            <button class="btn-toggle ${state.currentRound[`p${i}`].double ? 'active' : ''}" style="width:100%; margin-bottom:10px;" onclick="toggleState(${i}, 'double')">Çift</button>
-                        </div>
-
-                        <div class="penalty-actions">
-                            <button class="btn-danger btn-small" onclick="addPenalty(${i}, 101, '+101')">+101</button>
+                        <div class="penalty-actions penalty-actions-stack">
+                            <button class="btn-toggle ${state.currentRound[`p${i}`].double ? 'active' : ''}" onclick="toggleState(${i}, 'double')">Çift</button>
                             <button class="btn-outline btn-small" onclick="askCustomPenalty(${i})">Ceza</button>
                         </div>
                     </div>`).join('')}
@@ -1197,6 +1309,8 @@ window.copyRoomLink = function() {
    INIT
    ============================================ */
 function init() {
+    applySavedTheme();
+
     const params = new URLSearchParams(window.location.search);
     const roomParam = params.get('room');
 
@@ -1257,8 +1371,8 @@ window.calcEval = calcEval;
 window.setMode = setMode;
 window.setWinner = setWinner;
 window.setWinType = setWinType;
-window.handleScoreInput = handleScoreInput;
 window.toggleState = toggleState;
-window.handleQuickPenalty = handleQuickPenalty;
+window.toggleTheme = toggleTheme;
+window.toggleMute = toggleMute;
 
 init();
