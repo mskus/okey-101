@@ -82,33 +82,18 @@ function setUserName(name) {
     return false;
 }
 
+// Bildirim ikonları — tüm toast fonksiyonlarında ortak kullanılır
+const TOAST_ICONS = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+
+// Ekranda bildirim mesajı gösterir; ses çalmak için audioManager'ı kullanır
 function showToast(message, type = 'info') {
     const container = $('#toast-container');
     if (!container) return;
-
-    // --- Sound effects (non-blocking, fails silently if autoplay blocked) ---
-    const TOAST_SOUNDS = {
-        success: 'https://cdn.freesound.org/previews/256/256113_3263906-lq.mp3', // soft ding
-        error:   'https://cdn.freesound.org/previews/362/362204_6750864-lq.mp3', // short buzz
-        warning: 'https://cdn.freesound.org/previews/414/414209_5121236-lq.mp3', // gentle alert
-        info:    'https://cdn.freesound.org/previews/399/399934_1409058-lq.mp3', // neutral pop
-    };
-
-    if (localStorage.getItem(MUTE_STORAGE_KEY) !== '1') {
-        const soundUrl = TOAST_SOUNDS[type] || TOAST_SOUNDS.info;
-        try {
-            const sfx = new Audio(soundUrl);
-            sfx.volume = 0.45;
-            sfx.play().catch(() => {});
-        } catch (_) {}
-    }
-
-    // --- Build toast element ---
+    audioManager.play(type); // toast türüne göre merkezi ses çal
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
     toast.innerHTML = `
-        <span>${icons[type] || 'ℹ️'}</span>
+        <span>${TOAST_ICONS[type] || 'ℹ️'}</span>
         <span>${message}</span>
         <div class="toast-progress"></div>
     `;
@@ -116,10 +101,12 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 3000);
 }
 
+// JSON serileştirme ile derin kopya alır (undo için anlık durum snapshot'ı)
 function deepCloneState(src) {
     return JSON.parse(JSON.stringify(src));
 }
 
+// Aktif undo sayacını iptal eder, referansı sıfırlar
 function clearUndoToastTimer() {
     if (undoToastTimer) {
         clearTimeout(undoToastTimer);
@@ -127,15 +114,15 @@ function clearUndoToastTimer() {
     }
 }
 
+// "Geri Al" butonu içeren özel toast gösterir; 5 sn sonra otomatik kapanır
 function showUndoToast(message, type = 'warning') {
     const container = $('#toast-container');
     if (!container) return;
     clearUndoToastTimer();
     const toast = document.createElement('div');
     toast.className = `toast toast-undo ${type}`;
-    const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
     toast.innerHTML = `
-        <span>${icons[type] || 'ℹ️'}</span>
+        <span>${TOAST_ICONS[type] || 'ℹ️'}</span>
         <span class="toast-undo-msg">${message}</span>
         <button type="button" class="btn-undo-toast" onclick="performUndo()">Geri Al</button>
     `;
@@ -146,6 +133,7 @@ function showUndoToast(message, type = 'warning') {
     }, 5000);
 }
 
+// Önceki state snapshot'ına geri döner ve Firebase'e kaydeder
 window.performUndo = function() {
     if (!previousState || !roomRef) return;
     clearUndoToastTimer();
@@ -159,64 +147,85 @@ window.performUndo = function() {
 };
 
 /* ============================================
-   THEME & AUDIO
+   TEMA & SES YÖNETİMİ
+   ============================================ */
+/* ============================================
+   TEMA & SES YÖNETİMİ
    ============================================ */
 const THEME_STORAGE_KEY = 'okey_theme';
-const MUTE_STORAGE_KEY = 'okey_muted';
+const MUTE_STORAGE_KEY  = 'okey_muted';
 
+// Kayıtlı tema tercihini body sınıfına uygular
 function applySavedTheme() {
     const light = localStorage.getItem(THEME_STORAGE_KEY) === 'light';
     document.body.classList.toggle('light-theme', light);
 }
 
+// Tema ikonunu mevcut duruma göre döndürür
 function getThemeToggleIcon() {
     return document.body.classList.contains('light-theme') ? '🌙' : '☀️';
 }
 
+// Temayı aydınlık/karanlık arasında değiştirir ve kaydeder
 window.toggleTheme = function() {
     const next = document.body.classList.toggle('light-theme');
     localStorage.setItem(THEME_STORAGE_KEY, next ? 'light' : 'dark');
-    if (currentRoomId) render();
-    else renderLobby();
+    if (currentRoomId) render(); else renderLobby();
 };
 
+/**
+ * Merkezi ses yöneticisi — tüm new Audio() çağrıları buradan geçer.
+ */
 const audioManager = {
     urls: {
-        join_room: 'https://www.soundjay.com/buttons/sounds/button-09.mp3',
-        add_penalty: 'https://www.soundjay.com/buttons/sounds/button-10.mp3',
-        round_end: 'https://www.soundjay.com/buttons/sounds/button-21.mp3'
+        // Oyun olayı sesleri (Yeni ve Yüksek Kaliteli)
+        join_room:   'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3', // Odaya giriş (Yumuşak pop)
+        add_penalty: 'https://assets.mixkit.co/active_storage/sfx/2997/2997-preview.mp3', // Ceza yeme (Buzzer/Hata)
+        round_end:   'https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3', // El bitimi (Zafer zili)
+        game_over:   'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3', // Masa kapatma (Oyun bitişi)
+        
+        // Toast bildirim sesleri
+        success: 'https://cdn.freesound.org/previews/256/256113_3263906-lq.mp3',
+        error:   'https://cdn.freesound.org/previews/362/362204_6750864-lq.mp3',
+        warning: 'https://cdn.freesound.org/previews/414/414209_5121236-lq.mp3',
+        info:    'https://cdn.freesound.org/previews/399/399934_1409058-lq.mp3',
     },
+    // Sessiz modda veya URL yoksa çıkar; autoplay engeli sessizce yutulur
     play(key) {
         if (localStorage.getItem(MUTE_STORAGE_KEY) === '1') return;
         const url = this.urls[key];
         if (!url) return;
         try {
             const a = new Audio(url);
-            a.volume = 0.35;
+            // Oyun içi olay sesleri daha yüksek (0.70), normal bildirimler daha düşük (0.45) olsun
+            a.volume = key in { success: 1, error: 1, warning: 1, info: 1 } ? 0.45 : 0.70;
             a.play().catch(() => {});
-        } catch (e) {}
+        } catch (_) {}
     }
 };
 
+// Sesin kapalı olup olmadığını kontrol eder
 function isAudioMuted() {
     return localStorage.getItem(MUTE_STORAGE_KEY) === '1';
 }
 
+// Ses durumunu tersine çevirir ve arayüzü günceller
 window.toggleMute = function() {
     localStorage.setItem(MUTE_STORAGE_KEY, isAudioMuted() ? '0' : '1');
-    if (currentRoomId) render();
-    else renderLobby();
+    if (currentRoomId) render(); else renderLobby();
 };
 
+// Ses ikonunu mevcut mute durumuna göre döndürür
 function getMuteToggleIcon() {
     return isAudioMuted() ? '🔇' : '🔊';
 }
 
 function headerThemeMuteButtonsHTML() {
     return `<button type="button" class="btn-outline btn-icon" onclick="toggleTheme()" title="Gündüz / Gece">${getThemeToggleIcon()}</button>
-                <button type="button" class="btn-outline btn-icon" onclick="toggleMute()" title="Ses">${getMuteToggleIcon()}</button>`;
+            <button type="button" class="btn-outline btn-icon" onclick="toggleMute()" title="Ses">${getMuteToggleIcon()}</button>`;
 }
 
+// Metni panoya kopyalar; modern API yoksa eski execCommand yöntemine döner
 function copyToClipboard(text) {
     const onSuccess = () => showToast('Kopyalandı!', 'success');
     if (navigator.clipboard) {
@@ -232,6 +241,7 @@ function copyToClipboard(text) {
     }
 }
 
+// Milisaniyeyi SS:DD veya SS:DD:SS formatına dönüştürür
 function formatDuration(ms) {
     const totalSec = Math.floor(ms / 1000);
     const h = Math.floor(totalSec / 3600);
@@ -361,8 +371,9 @@ function getDefaultState() {
 let state = getDefaultState();
 
 /* ============================================
-   PRESENCE — GLOBAL & ROOM
+   VARLIK (PRESENCE) — GLOBAL & ODA
    ============================================ */
+// Kullanıcı bağlandığında global varlık listesine ekler; bağlantı kopunca otomatik siler
 const globalPresenceRef = db.ref('onlineUsers');
 db.ref('.info/connected').on('value', snap => {
     if (snap.val() === true) {
@@ -371,11 +382,13 @@ db.ref('.info/connected').on('value', snap => {
         conn.set({ name: currentUser, device: deviceType, time: Date.now() });
     }
 });
+// Global çevrimiçi sayısını izler ve footer'ı günceller
 globalPresenceRef.on('value', snap => {
     activeUsersGlobal = snap.numChildren();
     updateFooterCounts();
 });
 
+// Belirli bir odanın varlık dinleyicisini başlatır
 function attachRoomPresence(roomId) {
     if (roomPresenceRef) roomPresenceRef.off();
     roomPresenceRef = db.ref('lobiler/' + roomId + '/onlineUsers');
@@ -392,6 +405,7 @@ function attachRoomPresence(roomId) {
     });
 }
 
+// Oda varlık dinleyicisini kapatır ve sayacı sıfırlar
 function detachRoomPresence() {
     if (roomPresenceRef) {
         roomPresenceRef.off();
@@ -401,6 +415,7 @@ function detachRoomPresence() {
     updateFooterCounts();
 }
 
+// Footer'daki çevrimiçi sayısını ve etiketini günceller
 function updateFooterCounts() {
     const el = $('#active-users-count');
     if (el) el.innerText = currentRoomId ? activeUsersRoom : activeUsersGlobal;
@@ -409,8 +424,9 @@ function updateFooterCounts() {
 }
 
 /* ============================================
-   LOBBY FUNCTIONS
+   LOBİ FONKSİYONLARI
    ============================================ */
+// Yeni masa oluşturur; şifre opsiyoneldir, ilk oyuncu olarak mevcut kullanıcıyı ekler
 function createRoom() {
     const nameInput = $('#new-room-name');
     const passInput = $('#new-room-pass');
@@ -446,6 +462,7 @@ function createRoom() {
         });
 }
 
+// Firebase'deki oda state'ini dinlemeye başlar; timer ve presence bağlar
 function enterRoom(roomId) {
     detachLobbyList();
     currentRoomId = roomId;
@@ -471,6 +488,7 @@ function enterRoom(roomId) {
     });
 }
 
+// Tüm dinleyicileri kapatır, state'i sıfırlar ve lobiye geri döner
 function leaveRoom() {
     if (!confirm('Masadan ayrılacaksınız. Emin misiniz?')) return;
 
@@ -575,16 +593,19 @@ function performDelete(roomId) {
 }
 
 /* ============================================
-   SAVE STATE
+   DURUM KAYDETME & YARDIMCILAR
    ============================================ */
+// Mevcut state'i Firebase'e yazar; veri yüklenmeden önce yazmayı engeller
 function saveState() { 
     if (isDataLoaded && roomRef) roomRef.set(state); 
 }
 
+// Oyuncu adını döndürür; boşsa "Oyuncu N" varsayılanını kullanır
 function getPlayerName(idx) { 
     return state.players[idx] && state.players[idx].trim() !== "" ? state.players[idx] : `Oyuncu ${idx+1}`; 
 }
 
+// Eşli modda takım adını "İsim1 & İsim2" formatında üretir
 function getTeamName(teamIdx) {
     let p1 = getPlayerName(teamIdx === 0 ? 0 : 2).split(' ')[0];
     let p2 = getPlayerName(teamIdx === 0 ? 1 : 3).split(' ')[0];
@@ -684,16 +705,25 @@ function updateLiveTimer() {
 }
 
 /* ============================================
-   ROUND CALCULATION
+   EL HESAPLAMA
    ============================================ */
+/**
+ * Mevcut eli hesaplar:
+ * 1. Kazanan ve bitiş türüne göre çarpanları belirler
+ * 2. Her oyuncunun ceza puanını (boş kalan = 202) çarpanlarla çarpar
+ * 3. Sonuçları toplamları (totals) günceller ve geçmişe ekler
+ * 4. State'i kaydedip undo toast'ı gösterir
+ */
 window.calculateRound = function() {
-    previousState = deepCloneState(state);
+    previousState = deepCloneState(state); // undo için anlık kopya
 
     let winnerIdx = parseInt(state.currentRound.winner);
     let winType = state.currentRound.winType;
     let roundScores = [0, 0, 0, 0];
+    // Kazanan "çift" seçtiyse rakip puanları 2x olur
     let winnerWentDouble = winnerIdx >= 0 ? state.currentRound[`p${winnerIdx}`].double : false;
 
+    // Eşli modda takım ortağını belirler (0↔1, 2↔3)
     let partnerIdx = -1;
     if (winnerIdx === 0) partnerIdx = 1; else if (winnerIdx === 1) partnerIdx = 0;
     else if (winnerIdx === 2) partnerIdx = 3; else if (winnerIdx === 3) partnerIdx = 2;
@@ -740,6 +770,7 @@ window.calculateRound = function() {
     showUndoToast('El hesaplandı!', 'success');
 };
 
+// Belirtilen oyuncuya ceza puanı ekler, geçmişe kaydeder ve undo imkânı sunar
 window.addPenalty = function(idx, amt, reason) {
     previousState = deepCloneState(state);
 
@@ -887,8 +918,9 @@ window.deleteHistoryEntry = function(index) {
 };
 
 /* ============================================
-   FINISH & ARCHIVE
+   BİTİŞ & ARŞİV
    ============================================ */
+// Mevcut maçı arşive ekler, adisyonu kaydeder ve state'i sıfırlar
 window.finishAndArchive = function() {
     if(!confirm('Oyun sıfırlanacak ve veritabanı arşivine eklenecek, emin misiniz?')) return;
 
@@ -917,8 +949,9 @@ window.finishAndArchive = function() {
 };
 
 /* ============================================
-   STATS
+   İSTATİSTİKLER
    ============================================ */
+// Verilen oyuncu(lar) için biten el sayısını ve toplam ceza puanını döndürür
 function getStats(pIdx1, pIdx2 = -1) {
     let wins = 0; let pens = 0;
     (state.history || []).forEach(h => {
@@ -1227,7 +1260,7 @@ window.render = function() {
                 <div class="header-actions">
                     ${headerThemeMuteButtonsHTML()}
                     <button class="btn-outline btn-icon" onclick="copyRoomLink()">🔗</button>
-                    <button class="btn-danger btn-icon" onclick="leaveRoom()">🚪Masadan Çık</button>
+                    <button class="btn-danger btn-icon" onclick="leaveRoom()">🚪 Çık</button>
                 </div>
             </div>
 
@@ -1612,8 +1645,9 @@ window.sendChatMessage = function () {
 };
 
 /* ============================================
-   INIT
+   BAŞLATMA
    ============================================ */
+// Uygulamayı başlatır: temayı uygular, URL parametresinde oda varsa doğrudan o odaya girer
 function init() {
     applySavedTheme();
 
