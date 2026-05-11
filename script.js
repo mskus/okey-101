@@ -1227,7 +1227,7 @@ window.render = function() {
                 <div class="header-actions">
                     ${headerThemeMuteButtonsHTML()}
                     <button class="btn-outline btn-icon" onclick="copyRoomLink()">🔗</button>
-                    <button class="btn-danger btn-icon" onclick="leaveRoom()">🚪 Çık</button>
+                    <button class="btn-danger btn-icon" onclick="leaveRoom()">🚪Masadan Çık</button>
                 </div>
             </div>
 
