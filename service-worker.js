@@ -1,5 +1,4 @@
-/* Basic offline shell cache for 101 Okey Pro (same-origin assets only). */
-const CACHE_NAME = 'okey101-static-v1';
+const CACHE_NAME = 'okey101-static-v2'; // Sürüm adı v2 yapıldı, eski v1 cache'leri cihazlardan zorla silinecek
 const PRECACHE_URLS = ['./index.html', './style.css', './script.js', './manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -18,23 +17,26 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
+// YENİ: Network First (Önce Ağ) Stratejisi
 self.addEventListener('fetch', (event) => {
-    const { request } = event;
-    if (request.method !== 'GET') return;
+    if (event.request.method !== 'GET') return;
 
-    const url = new URL(request.url);
+    const url = new URL(event.request.url);
     if (url.origin !== self.location.origin) return;
 
     event.respondWith(
-        caches.match(request).then((cached) => {
-            if (cached) return cached;
-            return fetch(request).then((res) => {
-                if (res && res.ok && res.type === 'basic') {
-                    const copy = res.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        fetch(event.request)
+            .then((response) => {
+                // İnternet bağlantısı varsa daima yeni dosyayı çek ve arka planda cache'i güncelle
+                if (response && response.ok) {
+                    const copy = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
                 }
-                return res;
-            });
-        })
+                return response;
+            })
+            .catch(() => {
+                // Sadece cihaz internetsizse (offline) eski cache sürümünü göster
+                return caches.match(event.request);
+            })
     );
 });
