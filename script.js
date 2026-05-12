@@ -159,9 +159,6 @@ window.performUndo = function() {
 /* ============================================
    TEMA & SES YÖNETİMİ
    ============================================ */
-/* ============================================
-   TEMA & SES YÖNETİMİ
-   ============================================ */
 const THEME_STORAGE_KEY = 'okey_theme';
 const MUTE_STORAGE_KEY  = 'okey_muted';
 
@@ -321,6 +318,20 @@ function detachChat() {
         roomChatRef = null;
     }
 }
+window.toggleSettingsMenu = function(e) {
+    if (e) e.stopPropagation();
+    const menu = $('#settings-menu');
+    if (menu) menu.classList.toggle('active');
+};
+
+// Ekranın herhangi bir yerine tıklandığında menüyü kapat
+document.addEventListener('click', () => {
+    const menu = $('#settings-menu');
+    if (menu) menu.classList.remove('active');
+});
+
+// Menüyü de dışa aktar
+window.toggleSettingsMenu = toggleSettingsMenu;
 
 function updateChatUI(snap) {
     const box = $('#game-chat-messages');
@@ -495,8 +506,9 @@ function createRoom() {
     }
 
     const roomId = generateId();
-    const initialState = getDefaultState();
-    initialState.players[0] = currentUser;
+const initialState = getDefaultState();
+        initialState.players[0] = currentUser;
+        initialState.roomName = name;
 
     const roomData = {
         meta: {
@@ -1140,13 +1152,12 @@ function renderAdisyon() {
 function renderLobby() {
     const app = $('#app');
 
-    app.innerHTML = `
-<div class="lobby-header screen-enter">
+app.innerHTML = `
+        <div class="lobby-header screen-enter">
             <div class="header-content-wrapper">
                 <img src="logo.png" alt="101 Matik" class="header-logo-img">
                 <h1>101 MATİK</h1>
             </div>
-        </div>
         </div>
 
         <div class="card screen-enter" style="animation-delay:0.05s">
@@ -1155,7 +1166,6 @@ function renderLobby() {
                     👤 <input type="text" id="user-name-input" value="${currentUser}" 
                         onchange="saveUserName(this.value)" onclick="event.stopPropagation()">
                 </div>
-
             </div>
 
             <h3>🆕 Yeni Masa Kur</h3>
@@ -1165,6 +1175,19 @@ function renderLobby() {
                 <button class="btn-primary btn-glow" onclick="createRoom()">MASAYI KUR</button>
             </div>
         </div>
+
+        <a href="101Matik.apk" download style="display:block; text-decoration:none; margin-bottom:16px; animation: cardEnter 0.5s ease-out both 0.1s;">
+            <div class="card" style="background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; padding: 14px; display: flex; align-items: center; justify-content: space-between; border: none; margin-bottom:0; box-shadow: 0 4px 15px rgba(139,92,246,0.3);">
+                <div style="display:flex; align-items:center; gap: 12px;">
+                    <span style="font-size: 28px;">📱</span>
+                    <div style="text-align: left;">
+                        <div style="font-weight: 800; font-size: 14px; color:#fff;">Mobil Uygulamayı İndir</div>
+                        <div style="font-size: 12px; color:rgba(255,255,255,0.85);">Daha hızlı ve kesintisiz deneyim!</div>
+                    </div>
+                </div>
+                <span style="font-size: 20px;">⬇️</span>
+            </div>
+        </a>
 
         <div class="card lobby-rooms-card screen-enter" style="animation-delay:0.15s">
             <div class="lobby-rooms-head">
@@ -1180,24 +1203,38 @@ function renderLobby() {
                     <p style="font-size:13px;">Masalar yükleniyor...</p>
                 </div>
             </div>
-            <div class="lobby-sponsor-premium" aria-label="Sponsor alanı">
+        </div>
+
+                        <div class="lobby-sponsor-premium" aria-label="Sponsor alanı">
                 <div class="lobby-sponsor-premium-inner">
                     <div class="lobby-sponsor-premium-content">
                         <span class="lobby-sponsor-star" aria-hidden="true">✦</span>
                         <span class="lobby-sponsor-text">Sponsorlu İçerik Alanı</span>
                     </div>
-                </div>
-            </div>
-        </div>
+                </div></div></div>
 
-        <footer class="footer-bar">
-            <div class="footer-pill footer-pill--online">
-                <span class="live-dot live-dot--pulse-green" aria-hidden="true"></span>
-                <span id="active-users-label" class="footer-pill-label">Çevrimiçi</span>
-                <strong id="active-users-count" class="footer-pill-value">${activeUsersGlobal}</strong>
+<div class="card screen-enter" style="animation-delay:0.2s; border: 1px solid rgba(251,191,36,0.3); background: rgba(251,191,36,0.05);">
+<div class="card screen-enter" onclick="state.screen='rules'; render();" style="cursor:pointer; ...">
+            <h3 style="color: #fbbf24; text-align:left; margin-bottom:10px;">📜 Okey'in Altın Kuralları</h3>
+            <ul style="list-style: none; padding: 0; font-size: 13px; color: var(--text-muted); text-align: left; line-height: 1.8;">
+                <li>✨ <strong>Okey'e dönen</strong>, son taşı bekleyen her zaman kazanır.</li>
+                <li>✨ <strong>Yancının</strong> taşına güvenme, kendi taşını takip et.</li>
+                <li>✨ <strong>Hızlı oyna ENES</strong>, masanın enerjisini düşürme.</li>
+                <li>✨ <strong>Taş çalma</strong>, emeğinle ve zekanla bit.</li>
+                <li>✨ <strong>Perleri düzgün diz</strong>, kafan karışmasın!</li>
+            </ul>
+        </div>
+<div style="display:flex; align-items:center; gap:20px; font-size: 14px;">
+                <a href="https://github.com/mskus/okey-101" target="_blank" style="text-decoration:none; color:var(--text); opacity:0.8;" title="GitHub Kaynak Kodları">
+                    <span style="font-size:18px;">📂</span> GitHub
+                </a>
+                <span style="opacity:0.6;">🚀 v1.5.2</span>
+                <span style="opacity:0.6;">📅 ${new Date().getFullYear()}</span>
             </div>
-            <div class="footer-pill">${deviceType}</div>
-            <div class="footer-pill">IP: <strong class="footer-pill-mono">${clientIP}</strong></div>
+
+            <div style="font-size: 12px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px;">
+                💻 Crafted with ❤️ by <span style="color:var(--primary-light)">Muhammed Şafak Kuş</span>
+            </div>
         </footer>
     `;
 
@@ -1307,39 +1344,62 @@ function loadRoomList() {
    MAIN RENDER
    ============================================ */
 window.render = function() {
+
+    if (state.screen === 'rules') {
+        renderRulesPage();
+        return;
+    }
+
     if (!currentRoomId) {
         renderLobby();
         return;
     }
 
+
     const app = $('#app');
     const roomName = state.roomName || 'Masa';
-
-    const footerHTML = `
-        <footer class="footer-bar">
-            <div class="footer-pill footer-pill--online">
+const footerHTML = `
+        <footer class="footer-bar" style="flex-direction: column; gap: 10px; padding: 20px 0; border-top: 1px solid var(--border); margin-top: 30px;">
+            <div class="footer-pill footer-pill--online" style="border:none; box-shadow:none; background:transparent;">
                 <span class="live-dot live-dot--pulse-green" aria-hidden="true"></span>
-                <span id="active-users-label" class="footer-pill-label">Bu Masada</span>
+                <span id="active-users-label" class="footer-pill-label">Bu Masada:</span>
                 <strong id="active-users-count" class="footer-pill-value">${activeUsersRoom}</strong>
             </div>
-            <div class="footer-pill">${deviceType}</div>
-            <div class="footer-pill">IP: <strong class="footer-pill-mono">${clientIP}</strong></div>
+            
+            <div style="display:flex; gap:15px; font-size: 12px; opacity: 0.6;">
+                <a href="https://github.com/mskus/okey-101" target="_blank" style="text-decoration:none; color:inherit;">📂 GitHub</a>
+                <span>🚀 v1.5.2</span>
+                <span>📅 ${new Date().getFullYear()}</span>
+            </div>
+
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">
+                Geliştirici: Muhammed Şafak Kuş
+            </div>
         </footer>
     `;
 
     if (state.screen === 'setup') {
         app.innerHTML = `
-            <div class="game-header screen-enter">
-                <div>
-                    <h2>🎲 Masa Kurulumu</h2>
-                    <div class="room-name">${roomName}</div>
+<div class="game-header screen-enter" style="flex-direction: column; align-items: stretch; gap: 12px; margin-bottom: 16px;">
+            <div class="game-title-wrapper" style="justify-content: space-between; margin-bottom: 0;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <img src="logo.png" class="game-logo-img">
+                    <h2 style="margin:0; font-size:16px;">101 Matik | <span style="color:var(--primary-light)">${roomName}</span></h2>
                 </div>
-                <div class="header-actions">
+                <div style="display:flex; gap:6px;">
                     ${headerThemeMuteButtonsHTML()}
-                    <button class="btn-outline btn-icon" onclick="copyRoomLink()">🔗</button>
-                    <button class="btn-danger btn-icon" onclick="leaveRoom()">🚪 Çık</button>
                 </div>
             </div>
+            <div class="header-actions" style="justify-content: space-between; background: rgba(0,0,0,0.15); padding: 8px 12px; border-radius: 14px; border: 1px solid var(--border); display: flex; align-items: center;">
+                <span class="live-timer" id="live-timer" style="margin: 0; box-shadow: none; font-size: 14px; background: transparent; padding:0;">00:00</span>
+                <div style="display:flex; gap:8px;">
+                
+                    <button type="button" class="btn-primary btn-small" onclick="copyRoomLink()" style="padding: 8px 12px; font-size: 12px; width: auto; box-shadow: none;">🔗 Davet</button>
+                    
+                    <button type="button" class="btn-danger btn-small" onclick="leaveRoom()" style="padding: 8px 12px; font-size: 12px; width: auto; box-shadow: none;">🚪 Masadan Çık</button>
+                </div>
+            </div>
+        </div>
 
             <div class="card screen-enter" style="animation-delay:0.1s">
                 <div class="fast-select-group" style="margin-bottom:20px;">
@@ -1508,19 +1568,33 @@ window.render = function() {
     }).join('');
 
     app.innerHTML = `
-<div class="game-header screen-enter">
-            <div class="game-title-wrapper">
-                <img src="logo.png" class="game-logo-img">
-                <div>
-                    <h2>101 Matik  | ${roomName}</h2>
+<div class="game-header screen-enter" style="position: relative; z-index: 100; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            
+            <div style="flex-shrink: 0;">
+                <div class="live-timer" id="live-timer" style="font-size: 14px; background: rgba(0,0,0,0.25); border: 1px solid var(--border); padding: 6px 14px; border-radius: 20px; margin: 0; box-shadow: none;">00:00</div>
+            </div>
+
+            <div style="display:flex; align-items:center; justify-content:center; gap:6px; flex: 1; overflow: hidden;">
+                <img src="logo.png" class="game-logo-img" style="width: 22px; height: 22px; flex-shrink: 0;">
+                <h2 style="margin:0; font-size:15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    101 Matik | <span style="color:var(--primary-light)">${roomName}</span>
+                </h2>
+            </div>
+            
+            <div class="settings-dropdown" style="flex-shrink: 0;">
+                <button type="button" class="btn-outline btn-icon" onclick="toggleSettingsMenu(event)" style="border-radius:12px; width:42px; height:42px; padding:0; justify-content:center; margin:0; background:rgba(255,255,255,0.05);">
+                    ☰
+                </button>
+                <div id="settings-menu" class="settings-menu-content" style="margin-top: 8px;">
+                                    <button class="menu-item" onclick="copyRoomLink()"><span>🔗</span> Davet Et</button>
+                    <button class="menu-item" onclick="toggleTheme()"><span>${getThemeToggleIcon()}</span> Temayı Değiştir</button>
+                    <button class="menu-item" onclick="toggleMute()"><span>${getMuteToggleIcon()}</span> Sesleri Kapa/Aç</button>
+<button class="menu-item" onclick="state.screen='rules'; render();"> <span>📜</span> Detaylı Kurallar</button>
+                    <div class="menu-divider"></div>
+                    <button class="menu-item danger" onclick="leaveRoom()"><span>🚪</span> Masadan Ayrıl</button>
                 </div>
             </div>
-            <div class="header-actions">
-                ${headerThemeMuteButtonsHTML()}
-                <span class="live-timer" id="live-timer">00:00</span>
-                <button class="btn-outline btn-icon" onclick="copyRoomLink()">🔗</button>
-                <button class="btn-danger btn-icon" onclick="leaveRoom()">🚪 Çık</button>
-            </div>
+
         </div>
 
         <div class="card screen-enter" style="animation-delay:0.1s">
@@ -1773,6 +1847,70 @@ function init() {
         renderLobby();
     }
 }
+
+
+window.renderRulesPage = function() {
+    const app = $('#app');
+    app.innerHTML = `
+        <div class="game-header screen-enter" style="margin-bottom: 20px;">
+            <div style="display:flex; align-items:center; gap:15px;">
+                <button class="btn-outline btn-icon" onclick="state.screen='setup'; render();" style="width:auto; padding:8px 15px;">⬅ Geri Dön</button>
+                <h2 style="margin:0;">101 Okey Rehberi</h2>
+            </div>
+        </div>
+
+        <div class="card screen-enter" style="text-align:left; line-height:1.7; font-size:14px; color:var(--text);">
+            <h2 style="color:var(--primary-light); border-bottom:1px solid var(--border); padding-bottom:10px;">🎴 101 Okey Nasıl Oynanır?</h2>
+            
+            <section style="margin-top:20px;">
+                <h3 style="color:var(--accent);">1. Oyunun Amacı</h3>
+                <p>101 Okey, 106 taş ve 4 oyuncu ile oynanır. Temel amaç, elindeki taşları kurallı setler (perler) haline getirerek yere açmak veya elindeki taşları bitirerek rakiplerine ceza puanı yazdırmaktır. Oyun sonunda <strong>en az ceza puanına</strong> sahip olan oyuncu kazanır.</p>
+            </section>
+
+            <section style="margin-top:20px;">
+                <h3 style="color:var(--accent);">2. Taş Dağıtımı ve Başlangıç</h3>
+                <p>Dağıtıcı her oyuncuya 21 taş, kendisine ise 22 taş verir. Geri kalan taşlar yere kapalı dizilir. 22 taşı olan oyuncu taş çekmeden bir taş atarak oyunu başlatır.</p>
+            </section>
+
+            <section style="margin-top:20px;">
+                <h3 style="color:var(--accent);">3. Elin Açılması (101 Sayı Kuralı)</h3>
+                <p>Elinizi yere açabilmeniz için perlerinizin toplam değerinin <strong>en az 101</strong> olması gerekir. Eğer elinizde en az 5 çift varsa, "Çift" olarak da açabilirsiniz. Çift açtığınızda diğer oyuncuların seri per sayı zorunluluğu değişmez ancak sizin takibiniz farklılaşır.</p>
+            </section>
+
+            <section style="margin-top:20px;">
+                <h3 style="color:var(--accent);">4. Katlamalı Oyun Mantığı</h3>
+                <p>Eğer bir oyuncu yere açtıysa, bir sonraki oyuncunun açabilmesi için yerdeki en son açılan elin puanından <strong>en az 1 puan fazla</strong> toplamı olması gerekir (Örn: İlk açan 101, ikinci en az 102, üçüncü en az 103 açmalıdır).</p>
+            </section>
+
+            <section style="margin-top:20px;">
+                <h3 style="color:var(--accent);">5. Ceza Puanları (Çok Önemli!)</h3>
+                <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; background:rgba(0,0,0,0.2); border-radius:10px;">
+                    <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px;"><strong>Durum</strong></td><td style="padding:8px;"><strong>Ceza Puanı</strong></td></tr>
+                    <tr><td style="padding:8px;">Elde kalan taşların toplamı</td><td style="padding:8px;">Taşların sayı değeri kadar</td></tr>
+                    <tr><td style="padding:8px;">Hiç açamayan oyuncu</td><td style="padding:8px;">202 Ceza</td></tr>
+                    <tr><td style="padding:8px;">Çift giden ama açamayan</td><td style="padding:8px;">404 Ceza</td></tr>
+                    <tr><td style="padding:8px;">Yere Okey (Joker) atmak</td><td style="padding:8px;">101 Ceza</td></tr>
+                    <tr><td style="padding:8px;">Yanlış işlek vermek</td><td style="padding:8px;">101 Ceza</td></tr>
+                </table>
+            </section>
+
+            <section style="margin-top:20px;">
+                <h3 style="color:var(--accent);">6. Bitiş ve Puanlama</h3>
+                <p>Bir oyuncu elindeki tüm taşları bitirdiğinde o el sona erer. Bitiş türüne göre puanlar şu şekilde düşülür:</p>
+                <ul style="padding-left:20px;">
+                    <li><strong>Normal Bitiş:</strong> -101 Puan</li>
+                    <li><strong>Elden Bitiş:</strong> -202 Puan (Hiç taş çekmeden/yere taş işlemeden)</li>
+                    <li><strong>Okeyle Bitiş:</strong> -202 Puan</li>
+                    <li><strong>Elden + Okeyle Bitiş:</strong> -404 Puan</li>
+                </ul>
+            </section>
+        </div>
+
+        <footer style="margin-top:20px; padding:20px; opacity:0.6; font-size:12px;">
+            💻 101 Matik Teknik Rehber - Geliştirici: Muhammed Şafak Kuş
+        </footer>
+    `;
+};
 
 // Expose all functions to window for inline onclick handlers
 window.createRoom = createRoom;
