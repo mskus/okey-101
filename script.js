@@ -277,6 +277,7 @@ fetch('https://api.ipify.org?format=json')
    ============================================ */
 let currentUser = getUserName();
 let currentRoomId = null;
+let lastScreenBeforeRules = null;
 let roomRef = null;
 let presenceRef = null;
 let roomPresenceRef = null;
@@ -295,6 +296,46 @@ let lobbyListRef = null;
 let roomChatRef = null;
 
 const ROOM_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+
+// Kurallar butonuna tıkladığında bu fonksiyon çalışmalı
+window.openRules = function() {
+    // 1. Nereden geldiğimizi hafızaya al
+    if (!currentRoomId) {
+        lastScreenBeforeRules = 'lobby'; // Lobi ekranındaysak
+    } else {
+        lastScreenBeforeRules = state.screen; // Masa kurma veya oyun ekranındaysak
+    }
+
+    // 2. Senin rehber HTML kodlarını buraya ekleyerek ekranı çizdir
+    const app = $('#app');
+    app.innerHTML = `
+        <div class="game-header screen-enter" style="margin-bottom: 20px;">
+            <div style="display:flex; align-items:center; gap:15px;">
+                <button class="btn-outline btn-icon" onclick="closeRules()" style="width:auto; padding:8px 15px;">⬅ Geri Dön</button>
+                <h2 style="margin:0;">101 Okey Rehberi</h2>
+            </div>
+        </div>
+        
+        <div style="padding: 15px;">
+             <p>Kurallar burada yazıyor...</p>
+        </div>
+    `;
+};
+
+// Geri Dön butonuna tıkladığında bu fonksiyon çalışacak
+window.closeRules = function() {
+    // Hafızadaki ekrana göre doğru fonksiyonu çağır
+    if (lastScreenBeforeRules === 'lobby') {
+        renderLobby();
+    } else if (lastScreenBeforeRules === 'setup' || lastScreenBeforeRules === 'game') {
+        state.screen = lastScreenBeforeRules;
+        render();
+    } else {
+        renderLobby(); // Hata olursa varsayılan olarak lobiye at
+    }
+};
+
 
 function escapeHtml(s) {
     if (s == null) return '';
@@ -1852,9 +1893,9 @@ function init() {
 window.renderRulesPage = function() {
     const app = $('#app');
     app.innerHTML = `
-        <div class="game-header screen-enter" style="margin-bottom: 20px;">
+<div class="game-header screen-enter" style="margin-bottom: 20px;">
             <div style="display:flex; align-items:center; gap:15px;">
-                <button class="btn-outline btn-icon" onclick="state.screen='setup'; render();" style="width:auto; padding:8px 15px;">⬅ Geri Dön</button>
+                <button class="btn-outline btn-icon" onclick="closeRules()" style="width:auto; padding:8px 15px;">⬅ Geri Dön</button>
                 <h2 style="margin:0;">101 Okey Rehberi</h2>
             </div>
         </div>
